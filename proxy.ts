@@ -2,9 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require a logged-in session
-const PROTECTED = ['/dashboard', '/book']
+const PROTECTED = ['/dashboard', '/book', '/trip', '/account', '/tickets']
+// Admin area: requires a logged-in ADMIN (role in JWT app_metadata)
+const ADMIN = ['/admin']
 // Routes that logged-in users should be bounced away from
-const AUTH_ONLY = ['/login']
+const AUTH_ONLY = ['/login', '/signup']
 
 export default async function proxy(request: NextRequest) {
   // We must create a fresh response and thread cookies through it so the
@@ -41,10 +43,25 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
+  const role = (user?.app_metadata as { role?: string } | undefined)?.role
 
-  // Authenticated user hitting a login/register page → send to dashboard
+  // Admin area: must be a logged-in admin. Non-admins are sent home rather than
+  // shown that /admin exists. (Guards re-check server-side; never trust this alone.)
+  if (ADMIN.some(r => pathname.startsWith(r))) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+    if (role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return response
+  }
+
+  // Authenticated user hitting a login/signup page → send home
   if (user && AUTH_ONLY.some(r => pathname.startsWith(r))) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Unauthenticated user hitting a protected page → send to login, preserve destination
