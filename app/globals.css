@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SLUSH design tokens — mirrored exactly from slush-booking-prototype.html.
+   Tailwind v4 CSS-first config: these generate utilities
+   (bg-ink, text-soft, border-line, rounded-card, font-sans, sm:/md:/lg:/xl:).
+   ───────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Neutrals / ink */
+  --color-ink: #0E0E10;
+  --color-ink-2: #3F3F46;
+  --color-ink-hover: #26262B;
+  --color-soft: #71717A;
+  --color-line: #E5E7EB;
+  --color-line-2: #EEEEF0;
+  --color-bg: #F4F4F5;
+  --color-surface: #FFFFFF;
+  --color-panel: #0E0E10;
+
+  /* Fills / helpers */
+  --color-chip: #F1F1F2;
+  --color-soft-panel: #F7F7F8;
+  --color-placeholder: #A1A1AA;
+  --color-track: #EBEBED;
+
+  /* Success (green pill) */
+  --color-okbg: #E7F6EC;
+  --color-ok: #15803D;
+
+  /* Error / waitlist (red) */
+  --color-errbg: #FDE7E7;
+  --color-err: #B42318;
+
+  /* Radii */
+  --radius-card: 16px;
+  --radius-btn: 11px;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Breakpoints — the prototype's four collapse points, replacing v4 defaults */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 720px;
+  --breakpoint-lg: 820px;
+  --breakpoint-xl: 900px;
+}
+
+/* ─── Base layer: page defaults + prototype type scale ───────────────────── */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  h2 {
+    font-size: 19px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  /* Consistent focus ring across interactive elements */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  /* Placeholder colour to match the prototype */
+  ::placeholder {
+    color: var(--color-placeholder);
+  }
+}
+
+/* Respect reduced-motion globally (the hold ring and transitions honour this) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
