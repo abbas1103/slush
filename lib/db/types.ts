@@ -730,7 +730,7 @@ export type Database = {
       redeem_trip_code: { Args: { p_code: string }; Returns: string }
       release_hold: { Args: { p_booking_id: string }; Returns: undefined }
       start_booking: {
-        Args: { p_trip_code_id: string }
+        Args: { p_code: string }
         Returns: {
           booking_id: string
           expires_at: string

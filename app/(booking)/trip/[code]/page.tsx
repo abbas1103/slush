@@ -4,9 +4,9 @@ import { FlowBar } from "@/components/chrome/FlowBar";
 import { TripTabs } from "@/components/booking/TripTabs";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
-import { Button } from "@/components/ui/Button";
 import { Money } from "@/components/ui/Money";
 import { formatDateRange } from "@/lib/utils/dates";
+import { BookButton } from "@/components/booking/BookButton";
 
 export default async function TripDetailPage({
   params,
@@ -14,7 +14,8 @@ export default async function TripDetailPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const detail = await getTripByCode(decodeURIComponent(code));
+  const tripCode = decodeURIComponent(code);
+  const detail = await getTripByCode(tripCode);
   if (!detail) notFound();
 
   const { trip, extras, isFull } = detail;
@@ -149,22 +150,15 @@ export default async function TripDetailPage({
                     deposit to hold a spot. If a place opens up you&apos;re on the
                     trip; if not, we refund it in full.
                   </p>
-                  <Button className="mt-3 w-full" disabled>
-                    Join the waiting list →
-                  </Button>
                 </>
               ) : (
-                <>
-                  <div className="rounded-btn bg-soft-panel px-3 py-2 text-[13px] text-ink-2">
-                    🔒 Secure your place with a <Money pence={trip.deposit_amount} stripZeros /> deposit
-                  </div>
-                  <Button className="mt-3 w-full" disabled>
-                    Book this trip →
-                  </Button>
-                </>
+                <div className="rounded-btn bg-soft-panel px-3 py-2 text-[13px] text-ink-2">
+                  🔒 Secure your place with a <Money pence={trip.deposit_amount} stripZeros /> deposit
+                </div>
               )}
+              <BookButton code={tripCode} isFull={isFull} />
               <p className="mt-2 text-center text-[12px] text-soft">
-                Booking flow lands in the next slice.
+                Free cancellation within 24 hours · One place per booking
               </p>
             </div>
           </Card>
