@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe/client";
-import { createPaymentIntent } from "@/app/(booking)/book/actions";
+import { createPaymentIntent, reconcilePayment } from "@/app/(booking)/book/actions";
 import type { Pricing } from "@/lib/pricing/compute";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,7 @@ import { SummarySidebar } from "./SummarySidebar";
 
 const stripePromise = getStripe();
 
-function CheckoutForm({ bookingId, amount }: { bookingId: string; amount: number }) {
+function CheckoutForm({ bookingId, amount, piId }: { bookingId: string; amount: number; piId: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -38,8 +38,10 @@ function CheckoutForm({ bookingId, amount }: { bookingId: string; amount: number
       setSubmitting(false);
       return;
     }
-    // No redirect needed (e.g. non-3DS card) — go to confirmation; the webhook
-    // finalises the booking, and the confirmation page waits for it.
+    // Inline success (e.g. non-3DS card): reconcile now so the confirmation page
+    // reflects it immediately, without waiting on the webhook. Redirect methods
+    // (3DS, Amazon Pay) return to /confirmation where PaymentReturn reconciles.
+    await reconcilePayment(bookingId, piId);
     router.push(`/book/${bookingId}/confirmation`);
   }
 
@@ -135,7 +137,7 @@ export function PaymentPanel({
             <div className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">{error}</div>
           ) : clientSecret ? (
             <Elements key={clientSecret} stripe={stripePromise} options={{ clientSecret }}>
-              <CheckoutForm bookingId={bookingId} amount={amount} />
+              <CheckoutForm bookingId={bookingId} amount={amount} piId={clientSecret.split("_secret")[0]} />
             </Elements>
           ) : (
             <p className="text-[13px] text-soft">Loading secure payment…</p>

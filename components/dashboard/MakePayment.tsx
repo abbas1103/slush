@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe/client";
-import { createBalancePaymentIntent } from "@/app/(booking)/book/actions";
+import { createBalancePaymentIntent, reconcilePayment } from "@/app/(booking)/book/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Money } from "@/components/ui/Money";
@@ -12,7 +12,7 @@ import { formatPence } from "@/lib/utils/money";
 
 const stripePromise = getStripe();
 
-function BalanceCheckout({ amount }: { amount: number }) {
+function BalanceCheckout({ bookingId, amount, piId }: { bookingId: string; amount: number; piId: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -34,6 +34,9 @@ function BalanceCheckout({ amount }: { amount: number }) {
       setSubmitting(false);
       return;
     }
+    // Inline success: reconcile immediately. Redirect methods return to
+    // /dashboard where PaymentReturn reconciles.
+    await reconcilePayment(bookingId, piId);
     router.refresh();
   }
 
@@ -86,7 +89,7 @@ export function MakePayment({ bookingId, balance }: { bookingId: string; balance
           Paying <Money pence={amount} /> towards your balance.
         </div>
         <Elements key={clientSecret} stripe={stripePromise} options={{ clientSecret }}>
-          <BalanceCheckout amount={amount} />
+          <BalanceCheckout bookingId={bookingId} amount={amount} piId={clientSecret.split("_secret")[0]} />
         </Elements>
         <button
           type="button"

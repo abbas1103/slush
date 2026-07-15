@@ -8,6 +8,7 @@ import { Money } from "@/components/ui/Money";
 import { Timeline } from "@/components/ui/Timeline";
 import { buttonVariants } from "@/components/ui/Button";
 import { StatusPoller } from "@/components/booking/StatusPoller";
+import { PaymentReturn } from "@/components/booking/PaymentReturn";
 import { formatDate, formatDateRange } from "@/lib/utils/dates";
 
 export default async function ConfirmationPage({
@@ -59,6 +60,7 @@ export default async function ConfirmationPage({
 
   return (
     <div className="mx-auto max-w-[1120px] px-6 py-10">
+      <PaymentReturn bookingId={bookingId} />
       {isPending && <StatusPoller />}
 
       <div className="rounded-card bg-panel p-8 text-center text-white">

@@ -395,3 +395,49 @@ export async function createBalancePaymentIntent(
     return { ok: false, error: e instanceof Error ? e.message : "Payment setup failed." };
   }
 }
+
+// ── Reconcile a payment on return (resilient to webhook lag/miss) ────────────
+// The webhook is the canonical async writer; this is the belt-and-braces path
+// for when the user returns from Stripe before the event lands. Retrieves the
+// PaymentIntent server-side, verifies it belongs to the caller's booking, and
+// finalizes idempotently (same RPC + dedupe as the webhook).
+export async function reconcilePayment(
+  bookingId: string,
+  paymentIntentId: string,
+): Promise<{ ok: boolean; status?: string }> {
+  const auth = await getVerifiedUser();
+  if (!auth.ok) return { ok: false };
+  if (!/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) return { ok: false };
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("id, user_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking || booking.user_id !== auth.user.id) return { ok: false };
+
+  let pi;
+  try {
+    pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+  } catch {
+    return { ok: false };
+  }
+  // The PI must belong to THIS booking (prevents finalising an unrelated intent).
+  if (pi.metadata?.booking_id !== bookingId) return { ok: false };
+
+  if (pi.status === "succeeded") {
+    const kind = pi.metadata.payment_kind;
+    const charge = typeof pi.latest_charge === "string" ? pi.latest_charge : "";
+    if (kind) {
+      await admin.rpc("record_payment_and_finalize", {
+        p_booking_id: bookingId,
+        p_intent_id: pi.id,
+        p_charge_id: charge,
+        p_kind: kind,
+        p_amount_total: pi.amount,
+      });
+    }
+  }
+  return { ok: true, status: pi.status };
+}

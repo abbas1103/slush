@@ -7,6 +7,7 @@ import { MetricTile } from "@/components/ui/MetricTile";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { buttonVariants } from "@/components/ui/Button";
 import { MakePayment } from "@/components/dashboard/MakePayment";
+import { PaymentReturn } from "@/components/booking/PaymentReturn";
 import { formatDate, formatDateRange } from "@/lib/utils/dates";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1120px] px-6 py-8">
+      <PaymentReturn bookingId={booking.id} />
       <h1>My booking</h1>
       <p className="mt-1 text-soft">
         {trip.name} · {trip.organiser} · Ref {booking.reference}
