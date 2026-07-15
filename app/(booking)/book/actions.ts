@@ -4,6 +4,8 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computePricing, type Pricing } from "@/lib/pricing/compute";
+import { encryptPII } from "@/lib/crypto/pii";
+import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
 
 type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
@@ -153,4 +155,124 @@ export async function updateExtras(
     extras: finalLineItems,
   });
   return { ok: true, pricing };
+}
+
+// ── Save booking details (PII encrypted; insurance + consents persisted) ─────
+export type SaveDetailsResult = { ok: true } | { ok: false; error: string };
+
+export async function saveDetails(
+  bookingId: string,
+  input: DetailsInput,
+): Promise<SaveDetailsResult> {
+  const auth = await getVerifiedUser();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const parsed = detailsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check your details." };
+  }
+  const d = parsed.data;
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("id, user_id, trip_id, status")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking || booking.user_id !== auth.user.id) return { ok: false, error: "Booking not found." };
+  if (booking.status !== "pending") return { ok: false, error: "This booking can no longer be edited." };
+
+  const { data: trip } = await admin
+    .from("trips")
+    .select("start_date")
+    .eq("id", booking.trip_id)
+    .single();
+
+  // 18+ on arrival
+  const start = new Date(`${trip!.start_date}T00:00:00`);
+  const dob = new Date(`${d.dob}T00:00:00`);
+  let age = start.getFullYear() - dob.getFullYear();
+  const monthDiff = start.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && start.getDate() < dob.getDate())) age--;
+  if (age < 18) return { ok: false, error: "You must be 18 or over on arrival in resort." };
+
+  const nowIso = new Date().toISOString();
+
+  // Profile (sensitive fields encrypted at rest)
+  const { error: userErr } = await admin
+    .from("users")
+    .update({
+      title: d.title,
+      first_name: d.firstName,
+      last_name: d.lastName,
+      university_society: d.universitySociety || null,
+      student_id: d.studentId || null,
+      dob: d.dob,
+      nationality: d.nationality,
+      passport_number: encryptPII(d.passportNumber),
+      phone: d.phone,
+    })
+    .eq("id", auth.user.id);
+  if (userErr) return { ok: false, error: userErr.message };
+
+  // Emergency contact (single primary): replace
+  await admin.from("emergency_contacts").delete().eq("user_id", auth.user.id);
+  await admin.from("emergency_contacts").insert({
+    user_id: auth.user.id,
+    full_name: d.emergencyName,
+    relationship: d.emergencyRelationship || null,
+    phone: d.emergencyPhone,
+  });
+
+  // Booking: insurance choice + encrypted policy/access-needs
+  const insuranceDetails =
+    d.insuranceChoice === "own"
+      ? { insurer: d.insurer, policy: encryptPII(d.policyNumber), emergency_line: d.insuranceEmergencyLine }
+      : null;
+  await admin
+    .from("bookings")
+    .update({
+      insurance_choice: d.insuranceChoice,
+      insurance_details: insuranceDetails,
+      access_needs: encryptPII(d.accessNeeds || null),
+    })
+    .eq("id", bookingId);
+
+  // Consents (one record per booking): replace, no pre-ticked boxes
+  await admin.from("consents").delete().eq("booking_id", bookingId);
+  await admin.from("consents").insert({
+    user_id: auth.user.id,
+    booking_id: bookingId,
+    terms_version: "v1",
+    terms_accepted_at: nowIso,
+    marketing_opt_in: d.marketingOptIn,
+    marketing_opt_in_at: d.marketingOptIn ? nowIso : null,
+    health_data_consent: !!d.accessNeeds,
+    health_data_consent_at: d.accessNeeds ? nowIso : null,
+    share_access_needs_with_resort: d.shareAccessNeeds,
+    share_access_needs_at: d.shareAccessNeeds ? nowIso : null,
+  });
+
+  // Insurance cover extra (type 'other'): add if bought, remove if own
+  const { data: cover } = await admin
+    .from("extras")
+    .select("id, price")
+    .eq("trip_id", booking.trip_id)
+    .eq("type", "other")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  if (cover) {
+    await admin.from("booking_extras").delete().eq("booking_id", bookingId).eq("extra_id", cover.id);
+    if (d.insuranceChoice === "bought" && cover.price != null) {
+      await admin.from("booking_extras").insert({
+        booking_id: bookingId,
+        extra_id: cover.id,
+        quantity: 1,
+        price_at_booking: cover.price,
+      });
+    }
+  }
+
+  return { ok: true };
 }
