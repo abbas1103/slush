@@ -5,8 +5,10 @@ import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
 import { buttonVariants } from "@/components/ui/Button";
 import { formatDateRange } from "@/lib/utils/dates";
+import { requireAdminMfa } from "@/lib/auth/guards";
 
 export default async function AdminHome() {
+  await requireAdminMfa();
   const trips = await getAdminTrips();
   const totalExposure = trips.reduce((s, t) => s + t.exposure, 0);
 

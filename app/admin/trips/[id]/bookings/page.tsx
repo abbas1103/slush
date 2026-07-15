@@ -7,6 +7,7 @@ import { Money } from "@/components/ui/Money";
 import { buttonVariants } from "@/components/ui/Button";
 import { BookingActions } from "@/components/admin/BookingActions";
 import { cn } from "@/lib/utils/cn";
+import { requireAdminMfa } from "@/lib/auth/guards";
 
 const FILTERS = ["all", "confirmed", "waitlisted", "converted", "refunded", "pending"];
 
@@ -17,6 +18,7 @@ export default async function AdminBookingsPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ status?: string }>;
 }) {
+  await requireAdminMfa();
   const { id } = await params;
   const { status } = await searchParams;
   const { trip, rows } = await getAdminTripBookings(id);

@@ -6,10 +6,23 @@ import type { NextConfig } from "next";
  * Turnstile. Everything else is denied. Upstash is server-side only, so it's
  * not listed (CSP governs the browser). NOTE: script-src uses 'unsafe-inline'
  * as a pragmatic v1 — a nonce-based CSP (via the middleware) is the follow-up.
+ *
+ * 'unsafe-eval' is added in DEVELOPMENT ONLY: Next 16 + Turbopack (and React's
+ * dev tooling) use eval() for HMR and callstack reconstruction. React never
+ * uses eval() in production, so the prod CSP stays strict without it.
  */
+const isDev = process.env.NODE_ENV !== "production";
+const scriptSrc = [
+  "script-src 'self' 'unsafe-inline'",
+  isDev ? "'unsafe-eval'" : "",
+  "https://js.stripe.com https://challenges.cloudflare.com",
+]
+  .filter(Boolean)
+  .join(" ");
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://challenges.cloudflare.com",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self' data:",

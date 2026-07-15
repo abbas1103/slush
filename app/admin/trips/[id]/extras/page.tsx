@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { getAdminTrip } from "@/lib/db/admin-queries";
 import { ExtrasManager } from "@/components/admin/ExtrasManager";
 import type { Tables } from "@/lib/db/types";
+import { requireAdminMfa } from "@/lib/auth/guards";
 
 export default async function AdminExtrasPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminMfa();
   const { id } = await params;
   const data = await getAdminTrip(id);
   if (!data) notFound();

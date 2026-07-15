@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminMfa } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stripe } from "@/lib/stripe/server";
 import type { Json } from "@/lib/db/types";
@@ -10,7 +10,7 @@ type Result = { ok: true } | { ok: false; error: string };
 
 async function audit(action: string, targetType: string, targetId: string, metadata: Json) {
   const admin = createAdminClient();
-  const user = await requireAdmin();
+  const user = await requireAdminMfa();
   await admin.from("audit_log").insert({
     actor_user_id: user.id,
     actor_email: user.email ?? null,
@@ -42,7 +42,7 @@ export interface TripInput {
 }
 
 export async function saveTrip(tripId: string | null, input: TripInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const row = { ...input, base_inclusions: input.base_inclusions };
   if (tripId) {
@@ -62,7 +62,7 @@ export async function saveTrip(tripId: string | null, input: TripInput): Promise
 
 // ── Trip codes ─────────────────────────────────────────────────────────────
 export async function addTripCode(tripId: string, code: string): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const { error } = await admin.from("trip_codes").insert({ trip_id: tripId, code: code.trim(), active: true });
   if (error) return { ok: false, error: error.message };
@@ -72,7 +72,7 @@ export async function addTripCode(tripId: string, code: string): Promise<Result>
 }
 
 export async function setTripCodeActive(codeId: string, tripId: string, active: boolean): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const { error } = await admin.from("trip_codes").update({ active }).eq("id", codeId);
   if (error) return { ok: false, error: error.message };
@@ -95,7 +95,7 @@ export interface ExtraInput {
 }
 
 export async function saveExtra(extraId: string | null, tripId: string, input: ExtraInput): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   if (extraId) {
     const { error } = await admin.from("extras").update(input).eq("id", extraId);
@@ -111,7 +111,7 @@ export async function saveExtra(extraId: string | null, tripId: string, input: E
 }
 
 export async function reorderExtras(tripId: string, orderedIds: string[]): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   for (let i = 0; i < orderedIds.length; i++) {
     await admin.from("extras").update({ sort_order: i + 1 }).eq("id", orderedIds[i]);
@@ -121,7 +121,7 @@ export async function reorderExtras(tripId: string, orderedIds: string[]): Promi
 }
 
 export async function saveTier(tierId: string | null, extraId: string, tripId: string, name: string, price: number, sortOrder: number): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const row = { extra_id: extraId, name, price, sort_order: sortOrder };
   const { error } = tierId
@@ -134,7 +134,7 @@ export async function saveTier(tierId: string | null, extraId: string, tripId: s
 
 // ── Bookings: convert + refunds ──────────────────────────────────────────────
 export async function convertWaitlist(bookingId: string, tripId: string): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const { error } = await admin.rpc("admin_convert_booking", { p_booking_id: bookingId });
   if (error) return { ok: false, error: error.message };
@@ -157,7 +157,7 @@ async function depositIntentId(bookingId: string): Promise<string | null> {
 
 /** After the trip: refund the £100 damage deposit (minus any withholding). */
 export async function refundDamage(bookingId: string, tripId: string): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const { data: dd } = await admin
     .from("damage_deposits")
@@ -194,7 +194,7 @@ export async function refundDamage(bookingId: string, tripId: string): Promise<R
 
 /** Un-converted waitlister: refund the FULL £150 (incl. the £50 downpayment). */
 export async function refundWaitlist(bookingId: string, tripId: string): Promise<Result> {
-  await requireAdmin();
+  await requireAdminMfa();
   const admin = createAdminClient();
   const { data: booking } = await admin.from("bookings").select("status").eq("id", bookingId).maybeSingle();
   if (booking?.status !== "waitlisted") return { ok: false, error: "Only waitlisted bookings get the full refund." };

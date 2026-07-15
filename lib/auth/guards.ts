@@ -39,20 +39,53 @@ export function isAdmin(user: User | null): boolean {
   return user?.app_metadata?.role === "admin";
 }
 
-/** Has the session completed MFA (assurance level aal2)? */
-export function hasMfa(user: User | null): boolean {
-  // aal is exposed on the AMR/aal claim; Supabase surfaces it via getUser() too.
-  return (user as unknown as { aal?: string } | null)?.aal === "aal2";
-}
-
 /**
- * Require an admin. Returns 404-style redirect for non-admins so /admin's
- * existence isn't disclosed. MFA (aal2) is additionally enforced on
- * money/PII-affecting admin server actions.
+ * Require an admin. Redirects non-admins to /dashboard so /admin's existence
+ * isn't disclosed. This is the ROLE gate only — the second-factor gate is
+ * requireAdminMfa() below. Use this on the enrol/challenge screens (so they
+ * stay reachable) and as the base check everywhere.
  */
 export async function requireAdmin(): Promise<User> {
   const user = await getUser();
   if (!user) redirect("/login?next=/admin");
   if (!isAdmin(user)) redirect("/dashboard");
   return user;
+}
+
+/**
+ * The session's authenticator assurance level. Read from Supabase's MFA API —
+ * NOT from the User object (there is no `user.aal` field; the JWT carries the
+ * claim but the client SDK exposes it here). `currentLevel` is this session's
+ * level; `nextLevel` is the highest level the user *could* reach (aal2 iff they
+ * have a verified factor).
+ */
+export async function sessionAal(): Promise<{
+  currentLevel: string | null;
+  nextLevel: string | null;
+}> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return {
+    currentLevel: data?.currentLevel ?? null,
+    nextLevel: data?.nextLevel ?? null,
+  };
+}
+
+/**
+ * Require an admin who has completed a second factor this session (aal2). This
+ * is the real security boundary for the CMS — apply it to every admin page and
+ * every admin server action (admin writes use the service-role client, so RLS
+ * can't enforce this; the guard must). Redirects, in order:
+ *   - not logged in / not admin  → handled by requireAdmin()
+ *   - admin, no verified factor  → /admin/security (enrol)
+ *   - admin, factor not challenged this session → /admin/mfa (challenge)
+ *   - admin at aal2              → allowed
+ */
+export async function requireAdminMfa(): Promise<User> {
+  const user = await requireAdmin();
+  const { currentLevel, nextLevel } = await sessionAal();
+  if (currentLevel === "aal2") return user;
+  // nextLevel === 'aal2' means a verified factor exists but this session is
+  // still aal1 → challenge. Otherwise there's no factor yet → enrol.
+  redirect(nextLevel === "aal2" ? "/admin/mfa" : "/admin/security");
 }

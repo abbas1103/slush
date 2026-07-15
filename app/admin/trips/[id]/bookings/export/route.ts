@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminMfa } from "@/lib/auth/guards";
 import { getAdminTripBookings } from "@/lib/db/admin-queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -11,7 +11,7 @@ function csv(value: string | number): string {
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin_user = await requireAdmin();
+  const admin_user = await requireAdminMfa();
   const { id } = await params;
   const { trip, rows } = await getAdminTripBookings(id);
 
