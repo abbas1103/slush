@@ -7,6 +7,7 @@ import { computePricing, type Pricing } from "@/lib/pricing/compute";
 import { encryptPII } from "@/lib/crypto/pii";
 import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
 import { stripe } from "@/lib/stripe/server";
+import { rateLimit } from "@/lib/ratelimit";
 
 type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
@@ -309,6 +310,7 @@ export async function createPaymentIntent(
 ): Promise<IntentResult> {
   const auth = await getVerifiedUser();
   if (!auth.ok) return { ok: false, error: auth.error };
+  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts — please wait a moment." };
 
   const admin = createAdminClient();
   const { data: booking } = await admin
@@ -352,6 +354,7 @@ export async function createBalancePaymentIntent(
 ): Promise<IntentResult> {
   const auth = await getVerifiedUser();
   if (!auth.ok) return { ok: false, error: auth.error };
+  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts — please wait a moment." };
 
   const admin = createAdminClient();
   const { data: booking } = await admin

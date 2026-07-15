@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export type ResolveResult =
   | {
@@ -22,6 +23,9 @@ export type ResolveResult =
 export async function resolveTripCode(rawCode: string): Promise<ResolveResult> {
   const code = rawCode.trim();
   if (!code) return { ok: false };
+
+  // Rate-limit code guessing (per IP). No-op until Upstash is configured.
+  if (!(await rateLimit("tripCode", await clientIp()))) return { ok: false };
 
   const supabase = await createClient();
   const { data: tripId } = await supabase.rpc("redeem_trip_code", { p_code: code });
