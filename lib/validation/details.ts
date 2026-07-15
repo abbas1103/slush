@@ -13,7 +13,17 @@ export const detailsSchema = z
     lastName: z.string().min(1, "Enter your last name"),
     universitySociety: z.string().max(120).default(""),
     studentId: z.string().max(60).default(""),
-    dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth"),
+    dob: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth")
+      // Reject calendar-impossible dates (e.g. 2010-99-99, 2011-02-30) that the
+      // regex alone lets through — otherwise the server age check sees an
+      // Invalid Date and NaN < 18 is false, skipping the 18+ gate (audit #4).
+      .refine((s) => {
+        const [y, m, day] = s.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, day));
+        return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+      }, "Enter a valid date of birth"),
     nationality: z.string().min(1, "Select your nationality"),
     passportNumber: z.string().min(4, "Enter your passport number").max(60),
     phone: z.string().min(5, "Enter your mobile number").max(30),

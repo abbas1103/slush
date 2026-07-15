@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -69,7 +70,7 @@ export async function updateExtras(
 
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, user_id, trip_id, status")
+    .select("id, user_id, trip_id, status, payment_intent_id")
     .eq("id", bookingId)
     .maybeSingle();
   if (!booking || booking.user_id !== auth.user.id) {
@@ -77,6 +78,11 @@ export async function updateExtras(
   }
   if (booking.status !== "pending") {
     return { ok: false, error: "This booking can no longer be edited." };
+  }
+  // Extras lock: once a payable intent exists, the amount is committed. Editing
+  // extras here would let the charge and the recorded cost diverge (audit #1/#9).
+  if (booking.payment_intent_id) {
+    return { ok: false, error: "Payment has started — start over to change your extras." };
   }
 
   const { data: trip } = await admin
@@ -196,7 +202,11 @@ export async function saveDetails(
   let age = start.getFullYear() - dob.getFullYear();
   const monthDiff = start.getMonth() - dob.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && start.getDate() < dob.getDate())) age--;
-  if (age < 18) return { ok: false, error: "You must be 18 or over on arrival in resort." };
+  // Reject unparseable DOB too: NaN < 18 is false, which would silently skip
+  // the gate (audit #4). details.ts also validates the calendar date.
+  if (!Number.isFinite(age) || age < 18) {
+    return { ok: false, error: "You must be 18 or over on arrival in resort." };
+  }
 
   const nowIso = new Date().toISOString();
 
@@ -209,10 +219,10 @@ export async function saveDetails(
       last_name: d.lastName,
       university_society: d.universitySociety || null,
       student_id: d.studentId || null,
-      dob: d.dob,
+      dob: encryptPII(d.dob),
       nationality: d.nationality,
       passport_number: encryptPII(d.passportNumber),
-      phone: d.phone,
+      phone: encryptPII(d.phone),
     })
     .eq("id", auth.user.id);
   if (userErr) return { ok: false, error: userErr.message };
@@ -221,9 +231,11 @@ export async function saveDetails(
   await admin.from("emergency_contacts").delete().eq("user_id", auth.user.id);
   await admin.from("emergency_contacts").insert({
     user_id: auth.user.id,
-    full_name: d.emergencyName,
+    // Non-null: detailsSchema requires non-empty name/phone, so the cipher is
+    // always a string (encryptPII only returns null for empty/null input).
+    full_name: encryptPII(d.emergencyName)!,
     relationship: d.emergencyRelationship || null,
-    phone: d.emergencyPhone,
+    phone: encryptPII(d.emergencyPhone)!,
   });
 
   // Booking: insurance choice + encrypted policy/access-needs
@@ -304,6 +316,15 @@ async function bookingPricing(bookingId: string, tripId: string) {
   });
 }
 
+const PaymentMode = z.enum(["deposit", "full"]);
+// PaymentIntent statuses whose client_secret is still usable to complete a charge.
+const REUSABLE_PI = new Set([
+  "requires_payment_method",
+  "requires_confirmation",
+  "requires_action",
+  "processing",
+]);
+
 export async function createPaymentIntent(
   bookingId: string,
   mode: "deposit" | "full",
@@ -312,10 +333,15 @@ export async function createPaymentIntent(
   if (!auth.ok) return { ok: false, error: auth.error };
   if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts — please wait a moment." };
 
+  // The mode string becomes the ledger's payment_kind — never trust it raw.
+  const parsedMode = PaymentMode.safeParse(mode);
+  if (!parsedMode.success) return { ok: false, error: "Invalid payment option." };
+  const payMode = parsedMode.data;
+
   const admin = createAdminClient();
   const { data: booking } = await admin
     .from("bookings")
-    .select("id, user_id, trip_id, status, reference")
+    .select("id, user_id, trip_id, status, reference, payment_intent_id")
     .eq("id", bookingId)
     .maybeSingle();
   if (!booking || booking.user_id !== auth.user.id) return { ok: false, error: "Booking not found." };
@@ -323,24 +349,38 @@ export async function createPaymentIntent(
 
   // Amount is computed from the DB — the browser never sends it.
   const pricing = await bookingPricing(bookingId, booking.trip_id);
-  const amount = mode === "deposit" ? pricing.depositToday : pricing.payInFullToday;
+  const amount = payMode === "deposit" ? pricing.depositToday : pricing.payInFullToday;
 
   try {
-    const intent = await stripe.paymentIntents.create(
-      {
-        amount,
-        currency: "gbp",
-        automatic_payment_methods: { enabled: true },
-        metadata: {
-          booking_id: bookingId,
-          trip_id: booking.trip_id,
-          payment_kind: mode,
-          reference: booking.reference,
-        },
+    // One live deposit/full intent per booking (audit #9). Reuse the existing
+    // intent on a reload/in-flight auth (same amount, still completable); on a
+    // mode switch (amount changed) cancel it first so two intents can't both be
+    // confirmed and double-charge the customer.
+    if (booking.payment_intent_id) {
+      const existing = await stripe.paymentIntents.retrieve(booking.payment_intent_id).catch(() => null);
+      if (existing && REUSABLE_PI.has(existing.status) && existing.amount === amount) {
+        return { ok: true, clientSecret: existing.client_secret!, amount };
+      }
+      if (existing && REUSABLE_PI.has(existing.status)) {
+        await stripe.paymentIntents.cancel(existing.id).catch(() => {});
+      }
+    }
+
+    const intent = await stripe.paymentIntents.create({
+      amount,
+      currency: "gbp",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        booking_id: bookingId,
+        trip_id: booking.trip_id,
+        payment_kind: payMode,
+        reference: booking.reference,
       },
-      { idempotencyKey: `pi:${bookingId}:${mode}:${amount}` },
-    );
+    });
     if (!intent.client_secret) return { ok: false, error: "Could not initialise payment." };
+    // Record the single live intent so updateExtras can lock and a later call
+    // knows which one to reuse/cancel. Cleared in the finalize RPC on success.
+    await admin.from("bookings").update({ payment_intent_id: intent.id }).eq("id", bookingId);
     return { ok: true, clientSecret: intent.client_secret, amount };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Payment setup failed." };
@@ -378,20 +418,35 @@ export async function createBalancePaymentIntent(
   const balance = pricing.tripCost - paidToTrip;
   if (balance <= 0) return { ok: false, error: "Your balance is already cleared." };
 
-  const amount = Math.max(100, Math.min(Math.round(requestedAmount), balance));
+  // Clamp to what's owed — NEVER charge more than the outstanding balance
+  // (audit #6: the old £1 floor applied last could overcharge a sub-£1 balance).
+  const parsedReq = z.number().int().positive().safeParse(Math.round(requestedAmount));
+  if (!parsedReq.success) return { ok: false, error: "Enter a valid amount." };
+  const amount = Math.min(parsedReq.data, balance);
+  const STRIPE_MIN_GBP = 30; // Stripe's minimum GBP charge is £0.30
+  if (amount < STRIPE_MIN_GBP) {
+    return balance < STRIPE_MIN_GBP
+      ? { ok: false, error: "Your remaining balance is under £0.30 — please contact us to settle it." }
+      : { ok: false, error: "The minimum card payment is £0.30." };
+  }
 
   try {
-    const intent = await stripe.paymentIntents.create({
-      amount,
-      currency: "gbp",
-      automatic_payment_methods: { enabled: true },
-      metadata: {
-        booking_id: bookingId,
-        trip_id: booking.trip_id,
-        payment_kind: "balance",
-        reference: booking.reference,
+    const intent = await stripe.paymentIntents.create(
+      {
+        amount,
+        currency: "gbp",
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          booking_id: bookingId,
+          trip_id: booking.trip_id,
+          payment_kind: "balance",
+          reference: booking.reference,
+        },
       },
-    });
+      // Idempotency-Key (audit #8). Minute-bucketed so a lost-response retry
+      // dedupes, without colliding across genuinely separate top-ups.
+      { idempotencyKey: `bal:${bookingId}:${amount}:${Math.floor(Date.now() / 60000)}` },
+    );
     if (!intent.client_secret) return { ok: false, error: "Could not initialise payment." };
     return { ok: true, clientSecret: intent.client_secret, amount };
   } catch (e) {

@@ -29,6 +29,10 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
 - **Everything admins edit is data, not hardcoded** (trips, prices, extras, capacity, codes, terms).
 - **Authorise on `supabase.auth.getUser()`** (verifies the JWT), never `getSession()`. Re-check auth
   inside every server action — never rely on middleware alone.
+- **Admin MFA (TOTP) is self-enrolled on first login.** Grant the `admin` role only when the person is
+  ready to enrol their authenticator **immediately, in a trusted session** — a stolen password for a
+  not-yet-enrolled admin could otherwise bootstrap the second factor. Once enrolled, password-only never
+  reaches the CMS. (No clean code fix for first-factor bootstrap; this is an operational control.)
 - **Validate every input** with Zod `.strict()` at each server-action / route boundary; never accept
   `status` or `price` from the client.
 - **Use Plan Mode** for anything touching auth, payments, or the schema.

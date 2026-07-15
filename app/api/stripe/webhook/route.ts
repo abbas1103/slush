@@ -29,15 +29,29 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Idempotency: first sighting inserts; a duplicate (23505) is acked and skipped.
+  // Idempotency: first sighting inserts the marker row. On a duplicate (23505)
+  // we must NOT blindly ack — a prior delivery may have recorded the event but
+  // then FAILED to finalize (returned 5xx). We only skip when processed_at is
+  // set; otherwise we fall through and re-drive the handler (it is idempotent
+  // via payments UNIQUE(intent,type) + the FOR UPDATE finalize lock). This is
+  // what makes Stripe's automatic retry actually re-attempt a failed finalize
+  // instead of it being silently swallowed as a "duplicate".
   const { error: insErr } = await admin
     .from("stripe_events")
     .insert({ id: event.id, type: event.type, payload: JSON.parse(body) });
   if (insErr) {
-    if (insErr.code === "23505") {
+    if (insErr.code !== "23505") {
+      return new NextResponse("Could not record event", { status: 500 });
+    }
+    const { data: prior } = await admin
+      .from("stripe_events")
+      .select("processed_at")
+      .eq("id", event.id)
+      .maybeSingle();
+    if (prior?.processed_at) {
       return NextResponse.json({ received: true, duplicate: true });
     }
-    return new NextResponse("Could not record event", { status: 500 });
+    // Recorded but not yet processed → fall through and re-drive.
   }
 
   try {

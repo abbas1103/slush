@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdminMfa } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,6 +8,48 @@ import { stripe } from "@/lib/stripe/server";
 import type { Json } from "@/lib/db/types";
 
 type Result = { ok: true } | { ok: false; error: string };
+
+// Strict Zod schemas for admin writes (audit #11). `.strict()` rejects unknown
+// keys → no mass-assignment (e.g. an injected trip_id on saveExtra); money and
+// capacity fields are bounded non-negative integers so no negative/fractional
+// pence can be persisted. DB rows are built from PARSED data, never raw input.
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date");
+const pence = z.number().int().nonnegative();
+
+const tripInputSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    organiser: z.string().min(1).max(200),
+    resort: z.string().min(1).max(200),
+    country: z.string().min(1).max(100),
+    start_date: isoDate,
+    end_date: isoDate,
+    nights: z.number().int().positive().max(60),
+    base_price: pence,
+    base_inclusions: z.array(z.string().max(300)).max(100),
+    deposit_amount: pence,
+    downpayment_amount: pence,
+    damage_deposit_amount: pence,
+    balance_due_date: isoDate.nullable(),
+    capacity: z.number().int().nonnegative().max(100000),
+    description: z.string().max(5000),
+    status: z.enum(["draft", "live", "closed"]),
+  })
+  .strict();
+
+const extraInputSchema = z
+  .object({
+    type: z.enum(["transport", "equipment", "lessons", "event", "other"]),
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).nullable(),
+    price: pence.nullable(),
+    price_tbc: z.boolean(),
+    has_quality_tiers: z.boolean(),
+    single_select_group: z.string().max(100).nullable(),
+    sort_order: z.number().int().nonnegative(),
+    active: z.boolean(),
+  })
+  .strict();
 
 async function audit(action: string, targetType: string, targetId: string, metadata: Json) {
   const admin = createAdminClient();
@@ -43,8 +86,10 @@ export interface TripInput {
 
 export async function saveTrip(tripId: string | null, input: TripInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   await requireAdminMfa();
+  const parsed = tripInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid trip data." };
   const admin = createAdminClient();
-  const row = { ...input, base_inclusions: input.base_inclusions };
+  const row = parsed.data;
   if (tripId) {
     const { error } = await admin.from("trips").update(row).eq("id", tripId);
     if (error) return { ok: false, error: error.message };
@@ -63,10 +108,12 @@ export async function saveTrip(tripId: string | null, input: TripInput): Promise
 // ── Trip codes ─────────────────────────────────────────────────────────────
 export async function addTripCode(tripId: string, code: string): Promise<Result> {
   await requireAdminMfa();
+  const parsed = z.string().trim().min(3).max(64).safeParse(code);
+  if (!parsed.success) return { ok: false, error: "Code must be 3–64 characters." };
   const admin = createAdminClient();
-  const { error } = await admin.from("trip_codes").insert({ trip_id: tripId, code: code.trim(), active: true });
+  const { error } = await admin.from("trip_codes").insert({ trip_id: tripId, code: parsed.data, active: true });
   if (error) return { ok: false, error: error.message };
-  await audit("trip_code_add", "trip", tripId, { code: code.trim() });
+  await audit("trip_code_add", "trip", tripId, { code: parsed.data });
   revalidatePath(`/admin/trips/${tripId}`);
   return { ok: true };
 }
@@ -96,15 +143,18 @@ export interface ExtraInput {
 
 export async function saveExtra(extraId: string | null, tripId: string, input: ExtraInput): Promise<Result> {
   await requireAdminMfa();
+  const parsed = extraInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid extra data." };
+  const data = parsed.data;
   const admin = createAdminClient();
   if (extraId) {
-    const { error } = await admin.from("extras").update(input).eq("id", extraId);
+    const { error } = await admin.from("extras").update(data).eq("id", extraId);
     if (error) return { ok: false, error: error.message };
   } else {
-    const { error } = await admin.from("extras").insert({ ...input, trip_id: tripId });
+    const { error } = await admin.from("extras").insert({ ...data, trip_id: tripId });
     if (error) return { ok: false, error: error.message };
   }
-  await audit("extra_save", "trip", tripId, { name: input.name, price: input.price, active: input.active });
+  await audit("extra_save", "trip", tripId, { name: data.name, price: data.price, active: data.active });
   revalidatePath(`/admin/trips/${tripId}/extras`);
   revalidatePath(`/trip`);
   return { ok: true };
@@ -122,8 +172,12 @@ export async function reorderExtras(tripId: string, orderedIds: string[]): Promi
 
 export async function saveTier(tierId: string | null, extraId: string, tripId: string, name: string, price: number, sortOrder: number): Promise<Result> {
   await requireAdminMfa();
+  const parsed = z
+    .object({ name: z.string().min(1).max(120), price: pence, sortOrder: z.number().int().nonnegative() })
+    .safeParse({ name, price, sortOrder });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid tier data." };
   const admin = createAdminClient();
-  const row = { extra_id: extraId, name, price, sort_order: sortOrder };
+  const row = { extra_id: extraId, name: parsed.data.name, price: parsed.data.price, sort_order: parsed.data.sortOrder };
   const { error } = tierId
     ? await admin.from("extra_tiers").update(row).eq("id", tierId)
     : await admin.from("extra_tiers").insert(row);
@@ -198,11 +252,22 @@ export async function refundWaitlist(bookingId: string, tripId: string): Promise
   const admin = createAdminClient();
   const { data: booking } = await admin.from("bookings").select("status").eq("id", bookingId).maybeSingle();
   if (booking?.status !== "waitlisted") return { ok: false, error: "Only waitlisted bookings get the full refund." };
-  const { data: trip } = await admin.from("trips").select("deposit_amount").eq("id", tripId).single();
   const piId = await depositIntentId(bookingId);
   if (!piId) return { ok: false, error: "No deposit payment to refund." };
+  // Refund the amount ACTUALLY captured on that intent (audit #4). A waitlisted
+  // pay-in-full booking paid trip cost + £100, not a flat £150 — so sum the
+  // succeeded ledger rows tied to this intent rather than a hardcoded deposit.
+  const { data: paidRows } = await admin
+    .from("payments")
+    .select("amount, type")
+    .eq("booking_id", bookingId)
+    .eq("stripe_payment_intent_id", piId)
+    .eq("status", "succeeded")
+    .in("type", ["deposit", "damage_deposit_hold", "balance"]);
+  const refundTotal = (paidRows ?? []).reduce((sum, p) => sum + p.amount, 0);
+  if (refundTotal <= 0) return { ok: false, error: "No captured amount to refund." };
   try {
-    const refund = await stripe.refunds.create({ payment_intent: piId, amount: trip!.deposit_amount });
+    const refund = await stripe.refunds.create({ payment_intent: piId, amount: refundTotal });
     await admin.from("bookings").update({ status: "refunded" }).eq("id", bookingId);
     await admin.from("damage_deposits").update({ status: "refunded", refunded_at: new Date().toISOString(), stripe_refund_id: refund.id }).eq("booking_id", bookingId).neq("status", "refunded");
     await admin.from("payments").insert({
@@ -210,10 +275,10 @@ export async function refundWaitlist(bookingId: string, tripId: string): Promise
       stripe_payment_intent_id: piId,
       stripe_refund_id: refund.id,
       type: "waitlist_refund",
-      amount: trip!.deposit_amount,
+      amount: refundTotal,
       status: "succeeded",
     });
-    await audit("waitlist_refund", "booking", bookingId, { amount: trip!.deposit_amount });
+    await audit("waitlist_refund", "booking", bookingId, { amount: refundTotal });
     revalidatePath(`/admin/trips/${tripId}/bookings`);
     return { ok: true };
   } catch (e) {

@@ -60,8 +60,9 @@ export default async function AdminSecurityPage() {
       </Card>
 
       <p className="mt-4 text-[12.5px] text-soft">
-        Lost your device? Contact the SLUSH owner — they can reset your second factor so you can
-        set it up again.
+        Set this up the moment your admin access is granted — until you enrol, a password alone can
+        reach the CMS. Lost your device? Contact the SLUSH owner — they can reset your second factor
+        so you can set it up again.
       </p>
     </div>
   );

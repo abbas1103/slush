@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_log: {
@@ -109,6 +134,7 @@ export type Database = {
           id: string
           insurance_choice: string | null
           insurance_details: Json | null
+          payment_intent_id: string | null
           reference: string
           status: Database["public"]["Enums"]["booking_status"]
           trip_code_id: string | null
@@ -121,6 +147,7 @@ export type Database = {
           id?: string
           insurance_choice?: string | null
           insurance_details?: Json | null
+          payment_intent_id?: string | null
           reference: string
           status?: Database["public"]["Enums"]["booking_status"]
           trip_code_id?: string | null
@@ -133,6 +160,7 @@ export type Database = {
           id?: string
           insurance_choice?: string | null
           insurance_details?: Json | null
+          payment_intent_id?: string | null
           reference?: string
           status?: Database["public"]["Enums"]["booking_status"]
           trip_code_id?: string | null
@@ -924,6 +952,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       booking_status: [
