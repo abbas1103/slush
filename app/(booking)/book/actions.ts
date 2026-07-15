@@ -344,3 +344,54 @@ export async function createPaymentIntent(
     return { ok: false, error: e instanceof Error ? e.message : "Payment setup failed." };
   }
 }
+
+// ── Balance payment intent (amount clamped server-side to [£1, outstanding]) ──
+export async function createBalancePaymentIntent(
+  bookingId: string,
+  requestedAmount: number,
+): Promise<IntentResult> {
+  const auth = await getVerifiedUser();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("id, user_id, trip_id, status, reference")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking || booking.user_id !== auth.user.id) return { ok: false, error: "Booking not found." };
+  if (booking.status !== "confirmed" && booking.status !== "converted") {
+    return { ok: false, error: "Balance payments open once your place is confirmed." };
+  }
+
+  const pricing = await bookingPricing(bookingId, booking.trip_id);
+  const { data: pays } = await admin
+    .from("payments")
+    .select("type, amount, status")
+    .eq("booking_id", bookingId);
+  const paidToTrip = (pays ?? [])
+    .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
+    .reduce((sum, p) => sum + p.amount, 0);
+  const balance = pricing.tripCost - paidToTrip;
+  if (balance <= 0) return { ok: false, error: "Your balance is already cleared." };
+
+  const amount = Math.max(100, Math.min(Math.round(requestedAmount), balance));
+
+  try {
+    const intent = await stripe.paymentIntents.create({
+      amount,
+      currency: "gbp",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        booking_id: bookingId,
+        trip_id: booking.trip_id,
+        payment_kind: "balance",
+        reference: booking.reference,
+      },
+    });
+    if (!intent.client_secret) return { ok: false, error: "Could not initialise payment." };
+    return { ok: true, clientSecret: intent.client_secret, amount };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Payment setup failed." };
+  }
+}

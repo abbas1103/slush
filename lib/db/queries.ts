@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/db/types";
+import { computePricing, type Pricing } from "@/lib/pricing/compute";
 
 export type ExtraWithTiers = Tables<"extras"> & {
   extra_tiers: Tables<"extra_tiers">[];
@@ -113,4 +114,97 @@ export async function getBookingContext(
   }));
 
   return { booking, trip, extras: normalised, selected: selected ?? [] };
+}
+
+export interface PaymentRow {
+  type: string;
+  amount: number;
+  status: string;
+  created_at: string;
+}
+
+export interface MyBooking {
+  booking: Pick<Tables<"bookings">, "id" | "status" | "reference" | "trip_id" | "created_at">;
+  trip: Tables<"trips">;
+  pricing: Pricing;
+  paidToTrip: number;
+  balance: number;
+  damageHeld: boolean;
+  payments: PaymentRow[];
+  selectedExtras: { type: string; name: string }[];
+}
+
+/**
+ * The current user's active booking with everything the dashboard + tickets
+ * need. RLS restricts to the user's own rows. Returns null if they have none.
+ */
+export async function getMyBooking(): Promise<MyBooking | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, status, reference, trip_id, created_at")
+    .in("status", ["pending", "confirmed", "waitlisted", "converted"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!booking) return null;
+
+  const { data: trip } = await supabase
+    .from("trips")
+    .select("*")
+    .eq("id", booking.trip_id)
+    .maybeSingle();
+  if (!trip) return null;
+
+  const { data: bes } = await supabase
+    .from("booking_extras")
+    .select("price_at_booking, quantity, extras(name, type), extra_tiers(name)")
+    .eq("booking_id", booking.id);
+  const { data: payments } = await supabase
+    .from("payments")
+    .select("type, amount, status, created_at")
+    .eq("booking_id", booking.id)
+    .order("created_at");
+
+  const lineItems = (bes ?? []).map((b) => {
+    const extra = b.extras as { name: string; type: string } | null;
+    const tier = b.extra_tiers as { name: string } | null;
+    return {
+      label: `${extra?.name ?? "Extra"}${tier ? ` — ${tier.name}` : ""}`,
+      amount: b.price_at_booking * b.quantity,
+    };
+  });
+  const pricing = computePricing({
+    basePrice: trip.base_price,
+    depositAmount: trip.deposit_amount,
+    downpaymentAmount: trip.downpayment_amount,
+    damageDepositAmount: trip.damage_deposit_amount,
+    extras: lineItems,
+  });
+  const paidToTrip = (payments ?? [])
+    .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
+    .reduce((sum, p) => sum + p.amount, 0);
+  const damageHeld = (payments ?? []).some(
+    (p) => p.type === "damage_deposit_hold" && p.status === "succeeded",
+  );
+  const selectedExtras = (bes ?? []).map((b) => {
+    const extra = b.extras as { name: string; type: string } | null;
+    return { type: extra?.type ?? "", name: extra?.name ?? "" };
+  });
+
+  return {
+    booking,
+    trip,
+    pricing,
+    paidToTrip,
+    balance: pricing.tripCost - paidToTrip,
+    damageHeld,
+    payments: payments ?? [],
+    selectedExtras,
+  };
 }
