@@ -130,6 +130,7 @@ export interface MyBooking {
   paidToTrip: number;
   balance: number;
   damageHeld: boolean;
+  damageStatus: string | null;
   payments: PaymentRow[];
   selectedExtras: { type: string; name: string }[];
 }
@@ -189,9 +190,17 @@ export async function getMyBooking(): Promise<MyBooking | null> {
   const paidToTrip = (payments ?? [])
     .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
     .reduce((sum, p) => sum + p.amount, 0);
-  const damageHeld = (payments ?? []).some(
-    (p) => p.type === "damage_deposit_hold" && p.status === "succeeded",
-  );
+  // Damage status comes from the damage_deposits state machine (source of truth),
+  // not the ledger row — so it flips to 'refunded' after the admin returns it.
+  const { data: dd } = await supabase
+    .from("damage_deposits")
+    .select("status")
+    .eq("booking_id", booking.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const damageStatus = dd?.status ?? null;
+  const damageHeld = damageStatus === "held";
   const selectedExtras = (bes ?? []).map((b) => {
     const extra = b.extras as { name: string; type: string } | null;
     return { type: extra?.type ?? "", name: extra?.name ?? "" };
@@ -204,6 +213,7 @@ export async function getMyBooking(): Promise<MyBooking | null> {
     paidToTrip,
     balance: pricing.tripCost - paidToTrip,
     damageHeld,
+    damageStatus,
     payments: payments ?? [],
     selectedExtras,
   };

@@ -33,7 +33,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const { booking, trip, pricing, paidToTrip, balance, damageHeld, payments } = data;
+  const { booking, trip, pricing, paidToTrip, balance, damageStatus, payments } = data;
+  const damageLabel =
+    damageStatus === "held" ? "held" : damageStatus === "refunded" ? "refunded" : damageStatus === "withheld" ? "withheld" : null;
   const cleared = balance <= 0;
   const confirmed = booking.status === "confirmed" || booking.status === "converted";
   const pct = pricing.tripCost > 0 ? (paidToTrip / pricing.tripCost) * 100 : 0;
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
         <MetricTile
           label="Pay by"
           value={formatDate(trip.balance_due_date)}
-          sub={damageHeld ? `${formatPence(trip.damage_deposit_amount)} deposit held` : undefined}
+          sub={damageLabel ? `${formatPence(trip.damage_deposit_amount)} deposit ${damageLabel}` : undefined}
         />
       </div>
 
@@ -83,7 +85,7 @@ export default async function DashboardPage() {
               <ProgressBar value={pct} label="Payment progress" />
               <div className="mt-2 text-[12.5px] text-soft">
                 <Money pence={paidToTrip} /> of <Money pence={pricing.tripCost} /> trip cost paid
-                {damageHeld && <> · <Money pence={trip.damage_deposit_amount} stripZeros /> refundable damage deposit held</>}
+                {damageLabel && <> · <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit {damageLabel}</>}
               </div>
             </div>
           </Card>
@@ -131,7 +133,8 @@ export default async function DashboardPage() {
               <div className="text-[15px] font-bold">Balance cleared 🎉</div>
               <p className="mt-1 text-[13px] text-soft">
                 You&apos;re all paid up — your tickets are unlocked.
-                {damageHeld && <> Your <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit is refunded after the trip.</>}
+                {damageStatus === "held" && <> Your <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit is refunded after the trip.</>}
+                {damageStatus === "refunded" && <> Your <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit has been refunded.</>}
               </p>
             </Card>
           )}
