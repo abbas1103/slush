@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { computePricing, type Pricing } from "@/lib/pricing/compute";
 import { encryptPII } from "@/lib/crypto/pii";
 import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
+import { stripe } from "@/lib/stripe/server";
 
 type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
@@ -275,4 +276,71 @@ export async function saveDetails(
   }
 
   return { ok: true };
+}
+
+// ── Create a PaymentIntent (amount recomputed server-side; never trusted) ────
+export type IntentResult =
+  | { ok: true; clientSecret: string; amount: number }
+  | { ok: false; error: string };
+
+async function bookingPricing(bookingId: string, tripId: string) {
+  const admin = createAdminClient();
+  const { data: trip } = await admin
+    .from("trips")
+    .select("base_price, deposit_amount, downpayment_amount, damage_deposit_amount")
+    .eq("id", tripId)
+    .single();
+  const { data: bes } = await admin
+    .from("booking_extras")
+    .select("price_at_booking, quantity")
+    .eq("booking_id", bookingId);
+  return computePricing({
+    basePrice: trip!.base_price,
+    depositAmount: trip!.deposit_amount,
+    downpaymentAmount: trip!.downpayment_amount,
+    damageDepositAmount: trip!.damage_deposit_amount,
+    extras: (bes ?? []).map((b) => ({ label: "", amount: b.price_at_booking * b.quantity })),
+  });
+}
+
+export async function createPaymentIntent(
+  bookingId: string,
+  mode: "deposit" | "full",
+): Promise<IntentResult> {
+  const auth = await getVerifiedUser();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const admin = createAdminClient();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("id, user_id, trip_id, status, reference")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (!booking || booking.user_id !== auth.user.id) return { ok: false, error: "Booking not found." };
+  if (booking.status !== "pending") return { ok: false, error: "This booking is no longer payable." };
+
+  // Amount is computed from the DB — the browser never sends it.
+  const pricing = await bookingPricing(bookingId, booking.trip_id);
+  const amount = mode === "deposit" ? pricing.depositToday : pricing.payInFullToday;
+
+  try {
+    const intent = await stripe.paymentIntents.create(
+      {
+        amount,
+        currency: "gbp",
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          booking_id: bookingId,
+          trip_id: booking.trip_id,
+          payment_kind: mode,
+          reference: booking.reference,
+        },
+      },
+      { idempotencyKey: `pi:${bookingId}:${mode}:${amount}` },
+    );
+    if (!intent.client_secret) return { ok: false, error: "Could not initialise payment." };
+    return { ok: true, clientSecret: intent.client_secret, amount };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Payment setup failed." };
+  }
 }
