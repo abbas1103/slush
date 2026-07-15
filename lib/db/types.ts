@@ -230,6 +230,39 @@ export type Database = {
           },
         ]
       }
+      crm_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          entity_id: string
+          event_type: string
+          id: string
+          last_error: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["crm_outbox_status"]
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          entity_id: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["crm_outbox_status"]
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          entity_id?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["crm_outbox_status"]
+        }
+        Relationships: []
+      }
       damage_deposits: {
         Row: {
           amount: number
@@ -748,6 +781,7 @@ export type Database = {
         | "converted"
         | "cancelled"
         | "refunded"
+      crm_outbox_status: "pending" | "sent" | "failed"
       damage_status: "held" | "refunded" | "withheld"
       extra_type: "transport" | "equipment" | "lessons" | "event" | "other"
       hold_status: "active" | "consumed" | "released" | "expired"
@@ -900,6 +934,7 @@ export const Constants = {
         "cancelled",
         "refunded",
       ],
+      crm_outbox_status: ["pending", "sent", "failed"],
       damage_status: ["held", "refunded", "withheld"],
       extra_type: ["transport", "equipment", "lessons", "event", "other"],
       hold_status: ["active", "consumed", "released", "expired"],
