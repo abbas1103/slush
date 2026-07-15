@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { decryptPII } from "@/lib/crypto/pii";
 import { getCrmAdapter } from "./adapters";
 
 /**
@@ -49,7 +50,8 @@ export async function processCrmOutbox(limit = 25): Promise<{ total: number; sen
           email: user?.email ?? "",
           firstName: user?.first_name ?? null,
           lastName: user?.last_name ?? null,
-          phone: user?.phone ?? null,
+          // phone is encrypted at rest — decrypt before handing to the CRM.
+          phone: decryptPII(user?.phone) ?? null,
           universitySociety: user?.university_society ?? null,
         });
         await adapter.upsertBooking({

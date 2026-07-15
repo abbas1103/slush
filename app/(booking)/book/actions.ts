@@ -317,13 +317,15 @@ async function bookingPricing(bookingId: string, tripId: string) {
 }
 
 const PaymentMode = z.enum(["deposit", "full"]);
-// PaymentIntent statuses whose client_secret is still usable to complete a charge.
-const REUSABLE_PI = new Set([
+// Statuses where the prior intent can still be safely cancelled/replaced.
+const CANCELABLE_PI = new Set([
   "requires_payment_method",
   "requires_confirmation",
   "requires_action",
-  "processing",
 ]);
+// Statuses where money is already moving or settled — must NEVER mint a second
+// chargeable intent for the booking (would double-charge; audit #9).
+const IN_FLIGHT_PI = new Set(["processing", "succeeded", "requires_capture"]);
 
 export async function createPaymentIntent(
   bookingId: string,
@@ -358,11 +360,27 @@ export async function createPaymentIntent(
     // confirmed and double-charge the customer.
     if (booking.payment_intent_id) {
       const existing = await stripe.paymentIntents.retrieve(booking.payment_intent_id).catch(() => null);
-      if (existing && REUSABLE_PI.has(existing.status) && existing.amount === amount) {
-        return { ok: true, clientSecret: existing.client_secret!, amount };
-      }
-      if (existing && REUSABLE_PI.has(existing.status)) {
-        await stripe.paymentIntents.cancel(existing.id).catch(() => {});
+      if (existing) {
+        if (IN_FLIGHT_PI.has(existing.status)) {
+          // A charge is already processing/settled — refuse rather than create a
+          // second chargeable intent. The webhook/reconcile finalizes it shortly.
+          return { ok: false, error: "A payment for this booking is already being processed. Please refresh in a moment." };
+        }
+        if (CANCELABLE_PI.has(existing.status)) {
+          if (existing.amount === amount) {
+            return { ok: true, clientSecret: existing.client_secret!, amount };
+          }
+          // Mode/amount switch: cancel the old intent and ONLY proceed if it
+          // actually cancelled — never leave two live intents (double-charge).
+          const cancelled = await stripe.paymentIntents
+            .cancel(existing.id)
+            .then(() => true)
+            .catch(() => false);
+          if (!cancelled) {
+            return { ok: false, error: "Couldn't update your payment — please refresh and try again." };
+          }
+        }
+        // else ('canceled') → fall through and mint a fresh intent.
       }
     }
 
@@ -443,9 +461,11 @@ export async function createBalancePaymentIntent(
           reference: booking.reference,
         },
       },
-      // Idempotency-Key (audit #8). Minute-bucketed so a lost-response retry
-      // dedupes, without colliding across genuinely separate top-ups.
-      { idempotencyKey: `bal:${bookingId}:${amount}:${Math.floor(Date.now() / 60000)}` },
+      // Idempotency-Key (audit #8). Keyed on paidToTrip, which increases after
+      // each succeeded payment — so a lost-response retry of the SAME top-up
+      // dedupes, but a later separate top-up (even same amount) gets a distinct
+      // key and never collides.
+      { idempotencyKey: `bal:${bookingId}:${paidToTrip}:${amount}` },
     );
     if (!intent.client_secret) return { ok: false, error: "Could not initialise payment." };
     return { ok: true, clientSecret: intent.client_secret, amount };
