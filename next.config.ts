@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
  * Static security headers. The Content-Security-Policy is NOT here — it's set
@@ -20,4 +21,25 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Wrap with Sentry ONLY when a DSN is configured. With no Sentry env (CI/local
+ * placeholder builds) the plugin is never invoked → zero warnings, clean build.
+ * `tunnelRoute` routes browser events same-origin (covered by the CSP's
+ * `connect-src 'self'`, so no CSP change) and dodges ad-blockers — proxy.ts
+ * excludes `/monitoring` from its matcher so the tunnel isn't intercepted.
+ * Source-map upload is gated on SENTRY_AUTH_TOKEN so tokenless builds pass.
+ */
+const sentryEnabled = !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN);
+
+export default sentryEnabled
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      tunnelRoute: "/monitoring",
+      sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+      widenClientFileUpload: true,
+      telemetry: false,
+      silent: !process.env.CI,
+    })
+  : nextConfig;

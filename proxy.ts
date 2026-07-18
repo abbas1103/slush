@@ -128,7 +128,9 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on everything except Next.js internals and static assets
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Run on everything except Next.js internals, static assets, and the Sentry
+    // tunnel route (`/monitoring`) — under Turbopack, middleware intercepting the
+    // tunnel breaks client-side event recording, so it must be excluded here.
+    '/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
