@@ -12,10 +12,19 @@ import { formatPence } from "@/lib/utils/money";
 
 const stripePromise = getStripe();
 
-function BalanceCheckout({ bookingId, amount, piId }: { bookingId: string; amount: number; piId: string }) {
+function BalanceCheckout({
+  bookingId,
+  amount,
+  piId,
+  onSuccess,
+}: {
+  bookingId: string;
+  amount: number;
+  piId: string;
+  onSuccess: () => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
-  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,10 +43,16 @@ function BalanceCheckout({ bookingId, amount, piId }: { bookingId: string; amoun
       setSubmitting(false);
       return;
     }
-    // Inline success: reconcile immediately. Redirect methods return to
-    // /dashboard where PaymentReturn reconciles.
-    await reconcilePayment(bookingId, piId);
-    router.refresh();
+    // Inline success: reconcile (idempotent with the webhook), then hand back to
+    // the parent to reset the form + refresh the balance. Without this a PARTIAL
+    // payment leaves this form stuck on "Processing…" (the card stays mounted
+    // because the balance isn't cleared).
+    try {
+      await reconcilePayment(bookingId, piId);
+    } catch {
+      // Payment already succeeded at Stripe; the webhook will finalise it.
+    }
+    onSuccess();
   }
 
   return (
@@ -52,17 +67,21 @@ function BalanceCheckout({ bookingId, amount, piId }: { bookingId: string; amoun
 }
 
 export function MakePayment({ bookingId, balance }: { bookingId: string; balance: number }) {
+  const router = useRouter();
   const [pounds, setPounds] = useState(() => (Math.min(20000, balance) / 100).toFixed(2));
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Quick-amount chips: only offer preset amounts strictly BELOW the balance, then
+  // always the "Pay balance" chip — so there's never a duplicate at £100/£200.
   const chips = [
-    { label: "£100", pence: 10000 },
-    { label: "£200", pence: 20000 },
+    ...[10000, 20000]
+      .filter((p) => p < balance)
+      .map((p) => ({ label: formatPence(p, { stripZeros: true }), pence: p })),
     { label: `Pay balance ${formatPence(balance, { stripZeros: true })}`, pence: balance },
-  ].filter((c) => c.pence <= balance || c.pence === balance);
+  ];
 
   async function begin() {
     setError(null);
@@ -89,7 +108,18 @@ export function MakePayment({ bookingId, balance }: { bookingId: string; balance
           Paying <Money pence={amount} /> towards your balance.
         </div>
         <Elements key={clientSecret} stripe={stripePromise} options={{ clientSecret }}>
-          <BalanceCheckout bookingId={bookingId} amount={amount} piId={clientSecret.split("_secret")[0]} />
+          <BalanceCheckout
+            bookingId={bookingId}
+            amount={amount}
+            piId={clientSecret.split("_secret")[0]}
+            onSuccess={() => {
+              // Return to the amount chooser and pull the refreshed (lower/
+              // cleared) balance so the card never gets stuck post-payment.
+              setClientSecret(null);
+              setPounds((Math.min(20000, balance) / 100).toFixed(2));
+              router.refresh();
+            }}
+          />
         </Elements>
         <button
           type="button"

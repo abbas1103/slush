@@ -71,6 +71,11 @@ export default async function ConfirmationPage({
               Confirming with your bank — this usually takes a few seconds. This
               page will update automatically.
             </p>
+            <p className="mt-4">
+              <Link href="/dashboard" className="text-[13px] text-white/80 underline">
+                Taking longer than expected? Go to my dashboard →
+              </Link>
+            </p>
           </>
         ) : isWaitlist ? (
           <>
@@ -144,7 +149,7 @@ export default async function ConfirmationPage({
           </Card>
 
           <aside className="flex flex-col gap-3">
-            <Link href="/" className={buttonVariants({ variant: "dark", pill: true }) + " w-full"}>
+            <Link href="/dashboard" className={buttonVariants({ variant: "dark", pill: true }) + " w-full"}>
               ⊞ Go to my dashboard
             </Link>
             <Card padding="sm">

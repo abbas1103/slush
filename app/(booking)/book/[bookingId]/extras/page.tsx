@@ -55,7 +55,7 @@ export default async function ExtrasPage({
 
   return (
     <>
-      <FlowBar step={1} backHref="/trip" backLabel="Back to trip" />
+      <FlowBar step={1} backHref="/trip" backLabel="Back to trip search" />
       <ExtrasFlow
         bookingId={bookingId}
         tripName={ctx.trip.name}

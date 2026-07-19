@@ -53,6 +53,9 @@ export default async function proxy(request: NextRequest) {
   const reqHeaders = () => {
     const h = new Headers(request.headers)
     h.set('content-security-policy', csp)
+    // Expose the real path so server layouts can preserve it as the post-login
+    // `next` target (headers() can't otherwise see the pathname).
+    h.set('x-pathname', request.nextUrl.pathname)
     if (nonce) h.set('x-nonce', nonce)
     return h
   }

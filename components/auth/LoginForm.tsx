@@ -11,14 +11,22 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { SocialButtons } from "./SocialButtons";
 import { Turnstile, turnstileEnabled } from "./Turnstile";
 
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({
+  next,
+  initialError,
+  resetDone,
+}: {
+  next: string;
+  initialError?: string;
+  resetDone?: boolean;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [captcha, setCaptcha] = useState<string>();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -51,6 +59,12 @@ export function LoginForm({ next }: { next: string }) {
           Welcome back. Enter your details to continue.
         </p>
       </div>
+
+      {resetDone && !error && (
+        <div className="rounded-btn bg-okbg px-3 py-2 text-[13px] text-ok">
+          Your password has been updated — please log in.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">{error}</div>

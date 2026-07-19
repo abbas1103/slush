@@ -19,7 +19,12 @@ export function PaymentReturn({ bookingId }: { bookingId: string }) {
     if (!pi) return;
     done.current = true;
     reconcilePayment(bookingId, pi).then((r) => {
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        // Drop the Stripe return query (?payment_intent=…) from the address bar,
+        // staying on the current path, then re-fetch.
+        window.history.replaceState(null, "", window.location.pathname);
+        router.refresh();
+      }
     });
   }, [bookingId, router]);
 

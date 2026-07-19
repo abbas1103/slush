@@ -34,7 +34,7 @@ function TierRow({ tripId, extraId, tier }: { tripId: string; extraId: string; t
   );
 }
 
-function ExtraCard({ tripId, extra }: { tripId: string; extra: Extra | null }) {
+function ExtraCard({ tripId, extra, onSaved }: { tripId: string; extra: Extra | null; onSaved?: () => void }) {
   const router = useRouter();
   const [f, setF] = useState({
     type: extra?.type ?? "event",
@@ -68,6 +68,7 @@ function ExtraCard({ tripId, extra }: { tripId: string; extra: Extra | null }) {
     setBusy(false);
     if (!r.ok) return setErr(r.error);
     router.refresh();
+    onSaved?.(); // collapse the add-card so a new extra doesn't render twice
   }
 
   return (
@@ -110,7 +111,7 @@ export function ExtrasManager({ tripId, extras }: { tripId: string; extras: Extr
     <div className="flex flex-col gap-4">
       {extras.map((e) => <ExtraCard key={e.id} tripId={tripId} extra={e} />)}
       {adding ? (
-        <ExtraCard tripId={tripId} extra={null} />
+        <ExtraCard tripId={tripId} extra={null} onSaved={() => setAdding(false)} />
       ) : (
         <Button variant="out" onClick={() => setAdding(true)}>+ Add an extra</Button>
       )}

@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { requireVerified } from "@/lib/auth/guards";
 
 /** The booking flow (after the hold) requires a verified email — it collects
@@ -7,6 +8,7 @@ export default async function BookLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireVerified("/trip");
+  const path = (await headers()).get("x-pathname") ?? "/trip";
+  await requireVerified(path);
   return <>{children}</>;
 }
