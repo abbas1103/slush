@@ -4,8 +4,8 @@ import { sanitizeNext } from "@/lib/auth/next-url";
 
 /**
  * OAuth / email-link callback: exchanges the code for a session, then redirects
- * to the (sanitised) `next` path. Used by Google/Apple sign-in, email
- * confirmation, and password recovery.
+ * to the (sanitised) `next` path. Used by Google sign-in, email confirmation,
+ * and password recovery.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
