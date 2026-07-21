@@ -84,7 +84,7 @@ export default async function AdminBookingsPage({
                 <td className="p-2 text-right"><Money pence={r.tripCost} /></td>
                 <td className="p-2 text-right"><Money pence={r.paidToTrip} /></td>
                 <td className="p-2 text-right"><Money pence={r.balance} /></td>
-                <td className="p-2">{r.damageStatus ?? "—"}</td>
+                <td className="p-2">{r.damageStatus ?? "-"}</td>
                 <td className="p-2">
                   <BookingActions bookingId={r.id} tripId={id} status={r.status} damageStatus={r.damageStatus} />
                 </td>

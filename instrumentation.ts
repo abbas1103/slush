@@ -14,6 +14,6 @@ export async function register() {
   }
 }
 
-// App Router error hook — captures Server Component / route-handler / middleware
+// App Router error hook - captures Server Component / route-handler / middleware
 // errors. No-op until Sentry.init has run (i.e. when a DSN is set).
 export const onRequestError = Sentry.captureRequestError;

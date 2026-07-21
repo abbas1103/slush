@@ -20,7 +20,7 @@ create type extra_type as enum ('transport', 'equipment', 'lessons', 'event', 'o
 --   converted  → a waitlister promoted by admin (treated as confirmed)
 --   cancelled  → abandoned/expired pre-payment, or user cancellation
 --   refunded   → money returned (normal or full-£150 waitlist refund)
--- NOTE: 'pending' is added beyond the brief's list — a not-yet-paid booking
+-- NOTE: 'pending' is added beyond the brief's list - a not-yet-paid booking
 -- needs a non-terminal state; the capacity decision flips it at payment.
 create type booking_status as enum (
   'pending', 'confirmed', 'waitlisted', 'converted', 'cancelled', 'refunded'

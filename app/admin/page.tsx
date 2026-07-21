@@ -28,7 +28,7 @@ export default async function AdminHome() {
             <Money pence={totalExposure} grouped />
           </div>
           <div className="text-[12px] text-white/60">
-            Deposits held for un-converted waitlisters — a real refund liability.
+            Deposits held for un-converted waitlisters - a real refund liability.
           </div>
         </Card>
       )}

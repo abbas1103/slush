@@ -82,7 +82,7 @@ export async function updateExtras(
   // Extras lock: once a payable intent exists, the amount is committed. Editing
   // extras here would let the charge and the recorded cost diverge (audit #1/#9).
   if (booking.payment_intent_id) {
-    return { ok: false, error: "Payment has started — start over to change your extras." };
+    return { ok: false, error: "Payment has started - start over to change your extras." };
   }
 
   const { data: trip } = await admin
@@ -150,7 +150,7 @@ export async function updateExtras(
     const extra = row.extras as { name: string } | null;
     const tier = row.extra_tiers as { name: string } | null;
     return {
-      label: `${extra?.name ?? "Extra"}${tier ? ` — ${tier.name}` : ""}`,
+      label: `${extra?.name ?? "Extra"}${tier ? ` - ${tier.name}` : ""}`,
       amount: row.price_at_booking * row.quantity,
     };
   });
@@ -323,7 +323,7 @@ const CANCELABLE_PI = new Set([
   "requires_confirmation",
   "requires_action",
 ]);
-// Statuses where money is already moving or settled — must NEVER mint a second
+// Statuses where money is already moving or settled - must NEVER mint a second
 // chargeable intent for the booking (would double-charge; audit #9).
 const IN_FLIGHT_PI = new Set(["processing", "succeeded", "requires_capture"]);
 
@@ -333,9 +333,9 @@ export async function createPaymentIntent(
 ): Promise<IntentResult> {
   const auth = await getVerifiedUser();
   if (!auth.ok) return { ok: false, error: auth.error };
-  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts — please wait a moment." };
+  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts - please wait a moment." };
 
-  // The mode string becomes the ledger's payment_kind — never trust it raw.
+  // The mode string becomes the ledger's payment_kind - never trust it raw.
   const parsedMode = PaymentMode.safeParse(mode);
   if (!parsedMode.success) return { ok: false, error: "Invalid payment option." };
   const payMode = parsedMode.data;
@@ -349,7 +349,7 @@ export async function createPaymentIntent(
   if (!booking || booking.user_id !== auth.user.id) return { ok: false, error: "Booking not found." };
   if (booking.status !== "pending") return { ok: false, error: "This booking is no longer payable." };
 
-  // Amount is computed from the DB — the browser never sends it.
+  // Amount is computed from the DB - the browser never sends it.
   const pricing = await bookingPricing(bookingId, booking.trip_id);
   const amount = payMode === "deposit" ? pricing.depositToday : pricing.payInFullToday;
 
@@ -362,7 +362,7 @@ export async function createPaymentIntent(
       const existing = await stripe.paymentIntents.retrieve(booking.payment_intent_id).catch(() => null);
       if (existing) {
         if (IN_FLIGHT_PI.has(existing.status)) {
-          // A charge is already processing/settled — refuse rather than create a
+          // A charge is already processing/settled - refuse rather than create a
           // second chargeable intent. The webhook/reconcile finalizes it shortly.
           return { ok: false, error: "A payment for this booking is already being processed. Please refresh in a moment." };
         }
@@ -371,13 +371,13 @@ export async function createPaymentIntent(
             return { ok: true, clientSecret: existing.client_secret!, amount };
           }
           // Mode/amount switch: cancel the old intent and ONLY proceed if it
-          // actually cancelled — never leave two live intents (double-charge).
+          // actually cancelled - never leave two live intents (double-charge).
           const cancelled = await stripe.paymentIntents
             .cancel(existing.id)
             .then(() => true)
             .catch(() => false);
           if (!cancelled) {
-            return { ok: false, error: "Couldn't update your payment — please refresh and try again." };
+            return { ok: false, error: "Couldn't update your payment - please refresh and try again." };
           }
         }
         // else ('canceled') → fall through and mint a fresh intent.
@@ -412,7 +412,7 @@ export async function createBalancePaymentIntent(
 ): Promise<IntentResult> {
   const auth = await getVerifiedUser();
   if (!auth.ok) return { ok: false, error: auth.error };
-  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts — please wait a moment." };
+  if (!(await rateLimit("payment", auth.user.id))) return { ok: false, error: "Too many attempts - please wait a moment." };
 
   const admin = createAdminClient();
   const { data: booking } = await admin
@@ -436,7 +436,7 @@ export async function createBalancePaymentIntent(
   const balance = pricing.tripCost - paidToTrip;
   if (balance <= 0) return { ok: false, error: "Your balance is already cleared." };
 
-  // Clamp to what's owed — NEVER charge more than the outstanding balance
+  // Clamp to what's owed - NEVER charge more than the outstanding balance
   // (audit #6: the old £1 floor applied last could overcharge a sub-£1 balance).
   const parsedReq = z.number().int().positive().safeParse(Math.round(requestedAmount));
   if (!parsedReq.success) return { ok: false, error: "Enter a valid amount." };
@@ -444,7 +444,7 @@ export async function createBalancePaymentIntent(
   const STRIPE_MIN_GBP = 30; // Stripe's minimum GBP charge is £0.30
   if (amount < STRIPE_MIN_GBP) {
     return balance < STRIPE_MIN_GBP
-      ? { ok: false, error: "Your remaining balance is under £0.30 — please contact us to settle it." }
+      ? { ok: false, error: "Your remaining balance is under £0.30 - please contact us to settle it." }
       : { ok: false, error: "The minimum card payment is £0.30." };
   }
 
@@ -462,7 +462,7 @@ export async function createBalancePaymentIntent(
         },
       },
       // Idempotency-Key (audit #8). Keyed on paidToTrip, which increases after
-      // each succeeded payment — so a lost-response retry of the SAME top-up
+      // each succeeded payment - so a lost-response retry of the SAME top-up
       // dedupes, but a later separate top-up (even same amount) gets a distinct
       // key and never collides.
       { idempotencyKey: `bal:${bookingId}:${paidToTrip}:${amount}` },

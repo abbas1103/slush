@@ -75,7 +75,7 @@ export function MakePayment({ bookingId, balance }: { bookingId: string; balance
   const [loading, setLoading] = useState(false);
 
   // Quick-amount chips: only offer preset amounts strictly BELOW the balance, then
-  // always the "Pay balance" chip — so there's never a duplicate at £100/£200.
+  // always the "Pay balance" chip - so there's never a duplicate at £100/£200.
   const chips = [
     ...[10000, 20000]
       .filter((p) => p < balance)

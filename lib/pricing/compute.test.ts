@@ -9,7 +9,7 @@ const base = {
 };
 
 describe("computePricing (the money model)", () => {
-  it("base trip only — matches the brief's worked example", () => {
+  it("base trip only - matches the brief's worked example", () => {
     const p = computePricing({ ...base, extras: [] });
     expect(p.tripCost).toBe(43900); // £439
     expect(p.depositToday).toBe(15000); // £150 = £50 + £100

@@ -39,7 +39,7 @@ export function Ph({ children }: { children: React.ReactNode }) {
 export function DraftNotice() {
   return (
     <div className="mb-6 rounded-btn border border-line bg-chip px-4 py-3 text-[13px] text-ink-2">
-      <strong>Draft — pending legal review.</strong> This is a working template.
+      <strong>Draft - pending legal review.</strong> This is a working template.
       It must be reviewed by a qualified adviser and the bracketed details
       completed before SLUSH takes real bookings.
     </div>

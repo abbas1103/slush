@@ -9,7 +9,7 @@ interface CheckboxProps
 /**
  * `.cbox` custom checkbox: a native checkbox (visually hidden, keyboard- and
  * screen-reader-accessible) driving a styled 19px box. The white tick is always
- * rendered — invisible on the white unchecked box, visible on the ink checked box.
+ * rendered - invisible on the white unchecked box, visible on the ink checked box.
  */
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, children, ...props }, ref) => (

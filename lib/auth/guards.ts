@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * Authorization guards. All authorize on `getUser()` (verifies the JWT with the
  * Auth server), never `getSession()`. Call these inside every protected Server
- * Component / Server Action — never rely on middleware alone.
+ * Component / Server Action - never rely on middleware alone.
  */
 
 export async function getUser(): Promise<User | null> {
@@ -25,7 +25,7 @@ export async function requireUser(nextPath?: string): Promise<User> {
   return user;
 }
 
-/** Require a verified email — gates money/PII actions, not just login. */
+/** Require a verified email - gates money/PII actions, not just login. */
 export async function requireVerified(nextPath?: string): Promise<User> {
   const user = await requireUser(nextPath);
   if (!user.email_confirmed_at) {
@@ -41,7 +41,7 @@ export function isAdmin(user: User | null): boolean {
 
 /**
  * Require an admin. Redirects non-admins to /dashboard so /admin's existence
- * isn't disclosed. This is the ROLE gate only — the second-factor gate is
+ * isn't disclosed. This is the ROLE gate only - the second-factor gate is
  * requireAdminMfa() below. Use this on the enrol/challenge screens (so they
  * stay reachable) and as the base check everywhere.
  */
@@ -53,7 +53,7 @@ export async function requireAdmin(): Promise<User> {
 }
 
 /**
- * The session's authenticator assurance level. Read from Supabase's MFA API —
+ * The session's authenticator assurance level. Read from Supabase's MFA API -
  * NOT from the User object (there is no `user.aal` field; the JWT carries the
  * claim but the client SDK exposes it here). `currentLevel` is this session's
  * level; `nextLevel` is the highest level the user *could* reach (aal2 iff they
@@ -73,7 +73,7 @@ export async function sessionAal(): Promise<{
 
 /**
  * Require an admin who has completed a second factor this session (aal2). This
- * is the real security boundary for the CMS — apply it to every admin page and
+ * is the real security boundary for the CMS - apply it to every admin page and
  * every admin server action (admin writes use the service-role client, so RLS
  * can't enforce this; the guard must). Redirects, in order:
  *   - not logged in / not admin  → handled by requireAdmin()

@@ -13,7 +13,7 @@ function format(ms: number): string {
 
 /**
  * 30-minute hold modal. The countdown is derived from the server's expires_at
- * (so it survives reload); the server is the real authority — expired holds are
+ * (so it survives reload); the server is the real authority - expired holds are
  * freed lazily server-side regardless of this UI.
  */
 export function HoldModal({
@@ -55,13 +55,13 @@ export function HoldModal({
       </div>
       <p className="mt-4 text-[14px] text-soft">
         {isWaitlist
-          ? "We're holding your waiting-list spot for 30 minutes. Finish to secure your place in the queue — you'll pay the deposit, fully refundable if no place opens."
+          ? "We're holding your waiting-list spot for 30 minutes. Finish to secure your place in the queue - you'll pay the deposit, fully refundable if no place opens."
           : "We're holding your place for the next 30 minutes. Finish your booking to secure it."}
       </p>
 
       {expired ? (
         <div className="mt-5">
-          <p className="text-[13px] text-err">This hold has expired — your place has been released.</p>
+          <p className="text-[13px] text-err">This hold has expired - your place has been released.</p>
           <Button variant="out" className="mt-3 w-full" onClick={onRelease}>
             Back to the trip
           </Button>

@@ -10,7 +10,7 @@ const AUTH_ONLY = ['/login', '/signup']
 
 /**
  * Content-Security-Policy, built per request. In PRODUCTION a fresh nonce is
- * minted and `'unsafe-inline'` is dropped from script-src (audit #13) — Next
+ * minted and `'unsafe-inline'` is dropped from script-src (audit #13) - Next
  * injects the nonce into its own <script> tags when it sees a nonce in the
  * request's CSP header, and Stripe/Turnstile stay host-allowlisted. In DEV we
  * keep `'unsafe-inline'` + `'unsafe-eval'` (Turbopack/React HMR need them) and
@@ -43,7 +43,7 @@ function buildCsp(nonce: string | null): string {
 }
 
 export default async function proxy(request: NextRequest) {
-  // Per-request nonce (prod only). btoa/crypto are Edge-runtime globals — no Buffer.
+  // Per-request nonce (prod only). btoa/crypto are Edge-runtime globals - no Buffer.
   const nonce =
     process.env.NODE_ENV === 'production' ? btoa(crypto.randomUUID()) : null
   const csp = buildCsp(nonce)
@@ -132,7 +132,7 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Run on everything except Next.js internals, static assets, and the Sentry
-    // tunnel route (`/monitoring`) — under Turbopack, middleware intercepting the
+    // tunnel route (`/monitoring`) - under Turbopack, middleware intercepting the
     // tunnel breaks client-side event recording, so it must be excluded here.
     '/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

@@ -132,7 +132,7 @@ export default async function DashboardPage() {
             <Card>
               <div className="text-[15px] font-bold">Balance cleared 🎉</div>
               <p className="mt-1 text-[13px] text-soft">
-                You&apos;re all paid up — your tickets are unlocked.
+                You&apos;re all paid up - your tickets are unlocked.
                 {damageStatus === "held" && <> Your <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit is refunded after the trip.</>}
                 {damageStatus === "refunded" && <> Your <Money pence={trip.damage_deposit_amount} stripZeros /> damage deposit has been refunded.</>}
               </p>

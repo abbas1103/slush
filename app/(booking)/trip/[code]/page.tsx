@@ -76,7 +76,7 @@ export default async function TripDetailPage({
           <section id="lineup" className="scroll-mt-24 border-b border-line py-6">
             <h3>The line-up</h3>
             <p className="mt-1 text-[14px] text-soft">
-              Events across the week — all bookable as extras.
+              Events across the week - all bookable as extras.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {events.map((ev) => (
@@ -94,7 +94,7 @@ export default async function TripDetailPage({
           <section id="stay" className="scroll-mt-24 border-b border-line py-6">
             <h3>Where you&apos;ll stay</h3>
             <p className="mt-2 text-[14px] text-ink-2">
-              3★ chalet-style apartment — shared, close to the lifts and the main
+              3★ chalet-style apartment - shared, close to the lifts and the main
               strip, bed linen included.
             </p>
             <p className="mt-1 text-[12.5px] text-soft">Allocated on arrival.</p>
@@ -146,7 +146,7 @@ export default async function TripDetailPage({
                     ● This trip is full
                   </div>
                   <p className="mt-2 text-[13px] text-soft">
-                    Join the waiting list — pay your <Money pence={trip.deposit_amount} stripZeros />{" "}
+                    Join the waiting list - pay your <Money pence={trip.deposit_amount} stripZeros />{" "}
                     deposit to hold a spot. If a place opens up you&apos;re on the
                     trip; if not, we refund it in full.
                   </p>
@@ -169,7 +169,7 @@ export default async function TripDetailPage({
               <p className="mt-1 text-[13px] text-soft">
                 {coach.description ?? "Optional coach to resort"} is available as
                 an optional extra ({<Money pence={coach.price ?? 0} stripZeros />})
-                — or make your own way to resort.
+                - or make your own way to resort.
               </p>
             </Card>
           )}
@@ -177,7 +177,7 @@ export default async function TripDetailPage({
           <Card padding="sm">
             <div className="text-[13px] font-semibold text-ink">Booking for your group?</div>
             <p className="mt-1 text-[13px] text-soft">
-              Everyone books individually with the same trip code — share it with
+              Everyone books individually with the same trip code - share it with
               your group so you&apos;re all on the same trip.
             </p>
           </Card>

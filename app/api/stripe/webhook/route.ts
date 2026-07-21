@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
 
   // Idempotency: first sighting inserts the marker row. On a duplicate (23505)
-  // we must NOT blindly ack — a prior delivery may have recorded the event but
+  // we must NOT blindly ack - a prior delivery may have recorded the event but
   // then FAILED to finalize (returned 5xx). We only skip when processed_at is
   // set; otherwise we fall through and re-drive the handler (it is idempotent
   // via payments UNIQUE(intent,type) + the FOR UPDATE finalize lock). This is

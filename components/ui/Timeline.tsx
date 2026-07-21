@@ -8,7 +8,7 @@ export interface TimelineItem {
   now?: boolean;
 }
 
-/** `.timeline` — the "what happens next" list on the confirmation screen. */
+/** `.timeline` - the "what happens next" list on the confirmation screen. */
 export function Timeline({ items }: { items: TimelineItem[] }) {
   return (
     <ol className="flex flex-col gap-4">

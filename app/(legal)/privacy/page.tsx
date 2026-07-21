@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Section, P, Ul, Ph, DraftNotice } from "@/components/legal/prose";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — SLUSH",
+  title: "Privacy Policy - SLUSH",
   description: "How SLUSH collects, uses and protects your personal data.",
 };
 
@@ -18,10 +18,8 @@ export default function PrivacyPage() {
         <P>
           SLUSH (“we”, “us”) provides a booking platform for student ski trips
           run in partnership with university snowsports societies. For the
-          personal data described here, the data controller is{" "}
-          <Ph>SLUSH Ltd</Ph>, registered in England &amp; Wales (company no.{" "}
-          <Ph>00000000</Ph>), registered office <Ph>[address]</Ph>, ICO
-          registration <Ph>[ZA000000]</Ph>.
+          personal data described here, SLUSH is the data controller.{" "}
+          <Ph>[Operator legal status, address and any ICO registration to be confirmed.]</Ph>
         </P>
         <P>
           Questions about this policy or your data: <Ph>privacy@slush.example</Ph>.
@@ -34,9 +32,9 @@ export default function PrivacyPage() {
             "Account: email address and authentication details.",
             "Booking & traveller details: name, title, date of birth, nationality, passport number, phone number, home address, university/society and student ID.",
             "Emergency contact: name, relationship and phone number.",
-            "Health & accessibility: medical, dietary or access needs you choose to tell us (special-category data — collected only with your explicit consent).",
+            "Health & accessibility: medical, dietary or access needs you choose to tell us (special-category data - collected only with your explicit consent).",
             "Insurance: your policy details, or the winter-sports cover you buy through us.",
-            "Payments: handled by Stripe. We never see or store your full card number — only Stripe payment/charge identifiers and the amounts and status of payments.",
+            "Payments: handled by Stripe. We never see or store your full card number - only Stripe payment/charge identifiers and the amounts and status of payments.",
             "Technical: essential cookies for sign-in, and server logs (IP, timestamps) for security and reliability.",
           ]}
         />
@@ -45,11 +43,11 @@ export default function PrivacyPage() {
       <Section title="3. Why we use it, and our lawful basis">
         <Ul
           items={[
-            "To take and manage your booking and payments — performance of our contract with you.",
-            "Health, dietary, access needs and sharing them with the resort/organiser — your explicit consent.",
-            "Keeping financial records (e.g. for tax and accounting) — legal obligation.",
-            "Securing the platform and preventing fraud — our legitimate interests.",
-            "Marketing emails — only where you have opted in (consent); you can withdraw at any time.",
+            "To take and manage your booking and payments - performance of our contract with you.",
+            "Health, dietary, access needs and sharing them with the resort/organiser - your explicit consent.",
+            "Keeping financial records (e.g. for tax and accounting) - legal obligation.",
+            "Securing the platform and preventing fraud - our legitimate interests.",
+            "Marketing emails - only where you have opted in (consent); you can withdraw at any time.",
           ]}
         />
       </Section>
@@ -67,10 +65,10 @@ export default function PrivacyPage() {
       <Section title="5. Who we share it with">
         <Ul
           items={[
-            "Stripe — payment processing.",
-            "Supabase — our database and authentication provider (hosted in the EU).",
-            "The trip organiser / resort — the traveller manifest needed to run your trip.",
-            "Error-monitoring (Sentry) — technical diagnostics, with personal data scrubbed.",
+            "Stripe - payment processing.",
+            "Supabase - our database and authentication provider (hosted in the EU).",
+            "The trip organiser / resort - the traveller manifest needed to run your trip.",
+            "Error-monitoring (Sentry) - technical diagnostics, with personal data scrubbed.",
             "We do not sell your personal data.",
           ]}
         />
@@ -108,7 +106,7 @@ export default function PrivacyPage() {
 
       <Section title="9. Cookies">
         <P>
-          We use only essential cookies — to keep you signed in and to protect
+          We use only essential cookies - to keep you signed in and to protect
           sign-in with a CAPTCHA. We do not use advertising or cross-site
           tracking cookies.
         </P>

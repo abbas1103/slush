@@ -34,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const body = lines.join("\r\n");
 
-  // Log the export (who/when) — never the row data.
+  // Log the export (who/when) - never the row data.
   await createAdminClient().from("audit_log").insert({
     actor_user_id: admin_user.id,
     actor_email: admin_user.email ?? null,

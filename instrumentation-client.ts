@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 /**
  * Browser Sentry init (replaces the old sentry.client.config.ts convention).
  * ENV-GATED on the PUBLIC DSN (a DSN is publishable, not a secret; it must be
- * NEXT_PUBLIC_ to be inlined into the client bundle). No Session Replay — it
+ * NEXT_PUBLIC_ to be inlined into the client bundle). No Session Replay - it
  * records the DOM and would capture passport/DOB/payment fields. Same beforeSend
  * scrub as the server. Browser events are tunnelled same-origin (see
  * tunnelRoute in next.config.ts), so no CSP connect-src change is needed.

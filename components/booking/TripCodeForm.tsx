@@ -62,7 +62,7 @@ export function TripCodeForm() {
       {result && (
         <Card padding="none" className="mt-6 overflow-hidden text-left">
           <div className="bg-panel px-5 py-3 text-[13px] font-semibold text-white">
-            ✓ Code valid — we found your trip
+            ✓ Code valid - we found your trip
           </div>
           <div className="flex items-center justify-between gap-4 p-5">
             <div>

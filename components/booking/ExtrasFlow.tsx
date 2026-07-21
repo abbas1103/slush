@@ -133,7 +133,7 @@ export function ExtrasFlow(props: Props) {
       <div>
         <h1>Add your extras</h1>
         <p className="mt-2 text-[15px] text-soft">
-          Coach, kit, lessons and events for your place — add what you want, skip
+          Coach, kit, lessons and events for your place - add what you want, skip
           what you don&apos;t.
         </p>
 
@@ -155,7 +155,7 @@ export function ExtrasFlow(props: Props) {
         {equipment.length > 0 && (
           <Card className="mt-4">
             <h3>Equipment rental</h3>
-            <p className="mb-3 mt-1 text-[13px] text-soft">Optional — pick a package.</p>
+            <p className="mb-3 mt-1 text-[13px] text-soft">Optional - pick a package.</p>
             <div className="flex flex-col gap-2.5">
               <OptionRow
                 title="No equipment rental"

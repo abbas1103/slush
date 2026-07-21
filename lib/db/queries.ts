@@ -15,7 +15,7 @@ export interface TripDetail {
 /**
  * Resolve a trip code to its full detail (trip + active extras + tiers +
  * effective-full flag). Runs as the logged-in user; RLS lets them read the live
- * trip and its active extras. The trip_codes table itself stays hidden — the
+ * trip and its active extras. The trip_codes table itself stays hidden - the
  * code is resolved via the redeem_trip_code RPC. Returns null if the code is
  * invalid/inactive or the trip isn't live.
  */
@@ -74,7 +74,7 @@ export interface BookingContext {
 
 /**
  * Load a booking the current user owns (via RLS) plus its trip, the active extra
- * catalogue, and the current selections. Read-only — used by the extras/details
+ * catalogue, and the current selections. Read-only - used by the extras/details
  * pages. Returns null if the booking isn't the user's or doesn't exist.
  */
 export async function getBookingContext(
@@ -176,7 +176,7 @@ export async function getMyBooking(): Promise<MyBooking | null> {
     const extra = b.extras as { name: string; type: string } | null;
     const tier = b.extra_tiers as { name: string } | null;
     return {
-      label: `${extra?.name ?? "Extra"}${tier ? ` — ${tier.name}` : ""}`,
+      label: `${extra?.name ?? "Extra"}${tier ? ` - ${tier.name}` : ""}`,
       amount: b.price_at_booking * b.quantity,
     };
   });
@@ -191,7 +191,7 @@ export async function getMyBooking(): Promise<MyBooking | null> {
     .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
     .reduce((sum, p) => sum + p.amount, 0);
   // Damage status comes from the damage_deposits state machine (source of truth),
-  // not the ledger row — so it flips to 'refunded' after the admin returns it.
+  // not the ledger row - so it flips to 'refunded' after the admin returns it.
   const { data: dd } = await supabase
     .from("damage_deposits")
     .select("status")

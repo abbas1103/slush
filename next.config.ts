@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * Static security headers. The Content-Security-Policy is NOT here — it's set
+ * Static security headers. The Content-Security-Policy is NOT here - it's set
  * per-request in `proxy.ts` so it can carry a fresh nonce and drop
  * 'unsafe-inline' in production (see buildCsp there). These headers are static
  * and env-independent, so they stay in the Next config.
@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
  * Wrap with Sentry ONLY when a DSN is configured. With no Sentry env (CI/local
  * placeholder builds) the plugin is never invoked → zero warnings, clean build.
  * `tunnelRoute` routes browser events same-origin (covered by the CSP's
- * `connect-src 'self'`, so no CSP change) and dodges ad-blockers — proxy.ts
+ * `connect-src 'self'`, so no CSP change) and dodges ad-blockers - proxy.ts
  * excludes `/monitoring` from its matcher so the tunnel isn't intercepted.
  * Source-map upload is gated on SENTRY_AUTH_TOKEN so tokenless builds pass.
  */

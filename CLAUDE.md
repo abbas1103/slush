@@ -1,4 +1,4 @@
-# SLUSH — project context for Claude Code
+# SLUSH - project context for Claude Code
 
 SLUSH is a **production** booking-and-payments web app for student ski trips. It handles **real money
 and sensitive student PII**, so the bar is industry-standard or better on security and correctness.
@@ -16,7 +16,7 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
 ## Non-negotiables
 
 - **The database is the source of truth for money and capacity.** Never trust prices/amounts from the
-  browser — recompute every total server-side from DB rows before charging.
+  browser - recompute every total server-side from DB rows before charging.
 - **Money is integer pence everywhere** (DB, pricing, Stripe). No floats/decimals for currency.
 - **Financial rows (`payments`, `damage_deposits`) are written ONLY from the verified Stripe webhook**
   (service-role client), never from client callbacks. Idempotent on Stripe `event.id`.
@@ -28,9 +28,9 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
   fields at rest (AES-256-GCM, `lib/crypto/pii.ts`), never log PII, never put it in URLs, minimise retention.
 - **Everything admins edit is data, not hardcoded** (trips, prices, extras, capacity, codes, terms).
 - **Authorise on `supabase.auth.getUser()`** (verifies the JWT), never `getSession()`. Re-check auth
-  inside every server action — never rely on middleware alone.
+  inside every server action - never rely on middleware alone.
 - **Admin MFA (TOTP) is self-enrolled on first login.** Grant the `admin` role only when the person is
-  ready to enrol their authenticator **immediately, in a trusted session** — a stolen password for a
+  ready to enrol their authenticator **immediately, in a trusted session** - a stolen password for a
   not-yet-enrolled admin could otherwise bootstrap the second factor. Once enrolled, password-only never
   reaches the CMS. (No clean code fix for first-factor bootstrap; this is an operational control.)
 - **Validate every input** with Zod `.strict()` at each server-action / route boundary; never accept
@@ -51,7 +51,7 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
 
 - `holds` table is the server-side truth for the 30-min reservation; expiry is lazy + swept (pg_cron).
 - The confirmed-vs-waitlisted decision is made **atomically at payment success** in
-  `finalize_booking()` under `SELECT … FROM trips WHERE id FOR UPDATE` — never exceed capacity (never 301).
+  `finalize_booking()` under `SELECT … FROM trips WHERE id FOR UPDATE` - never exceed capacity (never 301).
 
 ## Build discipline
 
@@ -61,6 +61,6 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
 
 ## Commands
 
-- `npm run dev` — dev server · `npm run build` — production build · `npm run lint` — eslint
-- `npm test` — unit tests (Vitest) · `npx supabase start` — local Postgres+Auth (Docker)
-- `npx supabase db reset` — re-run migrations + seed · `npx supabase gen types typescript` — DB types
+- `npm run dev` - dev server · `npm run build` - production build · `npm run lint` - eslint
+- `npm test` - unit tests (Vitest) · `npx supabase start` - local Postgres+Auth (Docker)
+- `npx supabase db reset` - re-run migrations + seed · `npx supabase gen types typescript` - DB types

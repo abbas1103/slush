@@ -5,13 +5,13 @@ import QRCode from "qrcode";
 /**
  * HMAC key for ticket tokens. Derived from the server-only PII key via HKDF so
  * it is purpose-separated from the encryption use of that secret (distinct key
- * bytes), and **fails closed** if the secret is missing — never a hardcoded
+ * bytes), and **fails closed** if the secret is missing - never a hardcoded
  * fallback that would make tokens forgeable (audit #12).
  */
 let cachedTicketKey: Buffer | null = null;
 function signingKey(): Buffer {
   const raw = process.env.PII_ENCRYPTION_KEY;
-  if (!raw) throw new Error("PII_ENCRYPTION_KEY is not set — cannot sign ticket tokens");
+  if (!raw) throw new Error("PII_ENCRYPTION_KEY is not set - cannot sign ticket tokens");
   if (!cachedTicketKey) {
     cachedTicketKey = Buffer.from(
       hkdfSync("sha256", Buffer.from(raw), new Uint8Array(0), Buffer.from("slush-ticket-hmac"), 32),

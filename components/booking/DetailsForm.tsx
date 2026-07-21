@@ -114,7 +114,7 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
         <div>
           <h1>Your details</h1>
           <p className="mt-2 text-[15px] text-soft">
-            You&apos;re booking one place — just your details. Enter your name
+            You&apos;re booking one place - just your details. Enter your name
             exactly as it appears on your passport.
           </p>
         </div>
@@ -188,7 +188,7 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
 
         <Card>
           <h3>Anything we should know?</h3>
-          <p className="mt-1 text-[13px] text-soft">Medical or access requirements — optional.</p>
+          <p className="mt-1 text-[13px] text-soft">Medical or access requirements - optional.</p>
           <Textarea
             className="mt-3"
             rows={3}
@@ -227,7 +227,7 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
               </div>
             )}
             <OptionRow
-              title={<>Add winter sports cover — <Money pence={coverPrice} stripZeros /></>}
+              title={<>Add winter sports cover - <Money pence={coverPrice} stripZeros /></>}
               desc="Medical, piste closure, kit & cancellation."
               selected={f.insuranceChoice === "bought"}
               onClick={() => setF((p) => ({ ...p, insuranceChoice: "bought" }))}

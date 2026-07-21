@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Section, P, Ul, Ph, DraftNotice } from "@/components/legal/prose";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — SLUSH",
+  title: "Terms & Conditions - SLUSH",
   description: "The terms and booking conditions for SLUSH student ski trips.",
 };
 
@@ -16,10 +16,11 @@ export default function TermsPage() {
 
       <Section title="1. About these terms">
         <P>
-          These terms govern your booking with <Ph>SLUSH Ltd</Ph> (“we”, “us”)
-          for a student ski trip run in partnership with a university snowsports
-          society (the “organiser”). By making a booking you accept these terms
-          on behalf of everyone in your booking.
+          These terms govern your booking with SLUSH (“we”, “us”) for a student
+          ski trip run in partnership with a university snowsports society (the
+          “organiser”). By making a booking you accept these terms on behalf of
+          everyone in your booking.{" "}
+          <Ph>[Operator legal status and details to be confirmed.]</Ph>
         </P>
       </Section>
 
@@ -32,8 +33,8 @@ export default function TermsPage() {
         </P>
         <P>
           <Ph>
-            [Insolvency/financial protection to be confirmed — e.g. ABTA / ATOL /
-            trust account / bonding — and the protection statement inserted here
+            [Insolvency/financial protection to be confirmed - e.g. ABTA / ATOL /
+            trust account / bonding - and the protection statement inserted here
             before launch.]
           </Ph>
         </P>

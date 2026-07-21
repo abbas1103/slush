@@ -54,7 +54,7 @@ begin
 
   if p_kind in ('deposit', 'full') then
     -- #3: also place a booking the cron swept to 'cancelled' after its hold
-    -- expired — the customer paid, so they get a seat (or the waitlist).
+    -- expired - the customer paid, so they get a seat (or the waitlist).
     -- 'refunded' stays terminal and is never resurrected.
     if v_status in ('pending', 'cancelled') then
       if v_confirmed < v_capacity then

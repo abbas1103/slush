@@ -22,7 +22,7 @@ create index consents_user_idx    on consents(user_id);
 create index consents_booking_idx on consents(booking_id);
 
 -- Append-only audit trail for admin mutations and every refund.
--- metadata holds NO PII — only references, amounts, and old→new status.
+-- metadata holds NO PII - only references, amounts, and old→new status.
 create table audit_log (
   id            uuid primary key default gen_random_uuid(),
   actor_user_id uuid,

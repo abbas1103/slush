@@ -19,7 +19,7 @@ export default async function PaymentPage({
     const ex = ctx.extras.find((e) => e.id === s.extra_id);
     const tier = ex?.extra_tiers.find((t) => t.id === s.extra_tier_id);
     return {
-      label: `${ex?.name ?? "Extra"}${tier ? ` — ${tier.name}` : ""}`,
+      label: `${ex?.name ?? "Extra"}${tier ? ` - ${tier.name}` : ""}`,
       amount: s.price_at_booking * s.quantity,
     };
   });

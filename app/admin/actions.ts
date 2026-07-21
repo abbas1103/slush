@@ -60,7 +60,7 @@ async function audit(action: string, targetType: string, targetId: string, metad
     action,
     target_type: targetType,
     target_id: targetId,
-    metadata, // NO PII — refs/amounts/status only
+    metadata, // NO PII - refs/amounts/status only
   });
 }
 
@@ -255,7 +255,7 @@ export async function refundWaitlist(bookingId: string, tripId: string): Promise
   const piId = await depositIntentId(bookingId);
   if (!piId) return { ok: false, error: "No deposit payment to refund." };
   // Refund the amount ACTUALLY captured on that intent (audit #4). A waitlisted
-  // pay-in-full booking paid trip cost + £100, not a flat £150 — so sum the
+  // pay-in-full booking paid trip cost + £100, not a flat £150 - so sum the
   // succeeded ledger rows tied to this intent rather than a hardcoded deposit.
   const { data: paidRows } = await admin
     .from("payments")

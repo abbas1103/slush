@@ -14,7 +14,7 @@ interface OptionRowProps {
 }
 
 /**
- * `.opt` selection row — used for equipment single-select, insurance, pay-mode
+ * `.opt` selection row - used for equipment single-select, insurance, pay-mode
  * and payment-method choices. Selected = ink border + inset ring. The whole row
  * is the click target.
  */

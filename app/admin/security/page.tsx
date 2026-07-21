@@ -7,7 +7,7 @@ import { MfaEnroll } from "@/components/admin/MfaEnroll";
 
 /**
  * Admin two-factor setup. Role-gated only (NOT requireAdminMfa) so an admin
- * without a factor can reach it — that's the whole point. Shows enrolment when
+ * without a factor can reach it - that's the whole point. Shows enrolment when
  * there's no factor, otherwise the current status.
  */
 export default async function AdminSecurityPage() {
@@ -19,7 +19,7 @@ export default async function AdminSecurityPage() {
     <div className="mx-auto max-w-[560px]">
       <h1>Admin security</h1>
       <p className="mt-1 text-[15px] text-soft">
-        Two-factor authentication protects the CMS — bookings, payments, refunds and student data.
+        Two-factor authentication protects the CMS - bookings, payments, refunds and student data.
       </p>
 
       <Card className="mt-6" padding="lg">
@@ -60,8 +60,8 @@ export default async function AdminSecurityPage() {
       </Card>
 
       <p className="mt-4 text-[12.5px] text-soft">
-        Set this up the moment your admin access is granted — until you enrol, a password alone can
-        reach the CMS. Lost your device? Contact the SLUSH owner — they can reset your second factor
+        Set this up the moment your admin access is granted - until you enrol, a password alone can
+        reach the CMS. Lost your device? Contact the SLUSH owner - they can reset your second factor
         so you can set it up again.
       </p>
     </div>

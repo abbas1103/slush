@@ -68,7 +68,7 @@ export default async function ConfirmationPage({
           <>
             <h1 className="text-white">Processing your payment…</h1>
             <p className="mt-2 text-white/70">
-              Confirming with your bank — this usually takes a few seconds. This
+              Confirming with your bank - this usually takes a few seconds. This
               page will update automatically.
             </p>
             <p className="mt-4">
@@ -82,7 +82,7 @@ export default async function ConfirmationPage({
             <h1 className="text-white">You&apos;re on the waiting list ⏳</h1>
             <p className="mt-2 text-white/70">
               You&apos;ve secured a waiting-list spot for {trip.name}. If a place opens up
-              we&apos;ll confirm you and email you — if not, we refund your deposit in full.
+              we&apos;ll confirm you and email you - if not, we refund your deposit in full.
             </p>
           </>
         ) : (
@@ -132,7 +132,7 @@ export default async function ConfirmationPage({
             </div>
             {damageHeld && (
               <p className="mt-3 text-[12.5px] text-soft">
-                <Money pence={trip.damage_deposit_amount} stripZeros /> refundable damage deposit held —
+                <Money pence={trip.damage_deposit_amount} stripZeros /> refundable damage deposit held -
                 returned to your card after the trip.
               </p>
             )}
@@ -155,7 +155,7 @@ export default async function ConfirmationPage({
             <Card padding="sm">
               <div className="text-[13px] font-semibold">Pay at your own pace</div>
               <p className="mt-1 text-[13px] text-soft">
-                Top up your balance any time before {formatDate(trip.balance_due_date)} — in one go or
+                Top up your balance any time before {formatDate(trip.balance_due_date)} - in one go or
                 bit by bit. (Dashboard &amp; tickets arrive in the next slice.)
               </p>
             </Card>

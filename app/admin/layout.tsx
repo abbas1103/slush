@@ -8,7 +8,7 @@ export default async function AdminLayout({
 }) {
   // Role gate only (proxy.ts gates too; guards never trust middleware alone).
   // The second-factor (aal2) gate is requireAdminMfa(), applied per CMS page +
-  // per server action — NOT here, so /admin/security and /admin/mfa stay
+  // per server action - NOT here, so /admin/security and /admin/mfa stay
   // reachable for an admin who still needs to enrol or challenge.
   await requireAdmin();
   return (

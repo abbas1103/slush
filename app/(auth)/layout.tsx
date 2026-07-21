@@ -23,7 +23,7 @@ export default function AuthLayout({
           </h1>
           <p className="mt-4 max-w-sm text-[15px] text-white/70">
             Log in to enter your trip code, build your booking and grab your
-            lift pass — all in one place.
+            lift pass - all in one place.
           </p>
         </div>
         <svg

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 
 /**
  * TOTP enrolment for admins. Fetches a QR + secret from Supabase, then verifies
- * the first 6-digit code — a successful verify elevates THIS session to aal2
+ * the first 6-digit code - a successful verify elevates THIS session to aal2
  * (the browser client writes the new session to cookies, which the server then
  * reads). Any half-finished (unverified) TOTP factor is unenrolled first so a
  * retry can't wedge on a duplicate.
@@ -39,7 +39,7 @@ export function MfaEnroll() {
       friendlyName: "SLUSH admin",
     });
     if (error || !data) {
-      // e.g. TOTP disabled in the Supabase project — surface it plainly.
+      // e.g. TOTP disabled in the Supabase project - surface it plainly.
       setError(error?.message ?? "Could not start enrolment.");
       setPhase("ready");
       return;
@@ -85,7 +85,7 @@ export function MfaEnroll() {
       setPhase("ready");
       return;
     }
-    // Session is now aal2 — send them into the CMS.
+    // Session is now aal2 - send them into the CMS.
     router.replace("/admin");
     router.refresh();
   }
@@ -107,7 +107,7 @@ export function MfaEnroll() {
                 <img src={qr} alt="TOTP QR code" width={148} height={148} />
               ) : (
                 <span className="text-[13px] text-soft">
-                  {phase === "loading" ? "Generating…" : "—"}
+                  {phase === "loading" ? "Generating…" : "-"}
                 </span>
               )}
             </div>

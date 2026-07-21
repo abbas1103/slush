@@ -2,7 +2,7 @@
 -- Row Level Security: deny by default, explicit policies per table.
 -- Grants are least-privilege: clients get SELECT (+ self-service writes on their
 -- own contact/profile only). All booking/financial writes go through
--- SECURITY DEFINER RPCs or the service role — never a direct client write.
+-- SECURITY DEFINER RPCs or the service role - never a direct client write.
 -- (RLS is already enabled via the project's auto-RLS trigger; re-enabling here
 --  keeps the migration portable to a project without it. We do NOT force RLS,
 --  so SECURITY DEFINER functions and the service role still bypass it.)

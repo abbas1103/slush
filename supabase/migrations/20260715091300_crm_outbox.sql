@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────
--- CRM sync: an outbox queue + enqueue trigger. CRM-agnostic — the app writes
+-- CRM sync: an outbox queue + enqueue trigger. CRM-agnostic - the app writes
 -- events here whenever a booking is finalised/refunded; a processor (with the
 -- configured adapter) pushes them to whichever CRM is chosen later. Reliable
 -- (survives crashes / retries) and decoupled from the request path.

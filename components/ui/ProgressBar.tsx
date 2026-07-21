@@ -7,7 +7,7 @@ interface ProgressBarProps {
   label?: string;
 }
 
-/** `.progress` track + `.fill` — payment progress on confirmation/dashboard. */
+/** `.progress` track + `.fill` - payment progress on confirmation/dashboard. */
 export function ProgressBar({ value, className, label }: ProgressBarProps) {
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   return (

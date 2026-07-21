@@ -47,7 +47,7 @@ export default async function TicketsPage() {
         className={`mt-6 rounded-card p-5 ${unlocked ? "bg-okbg text-ok" : "bg-panel text-white"}`}
       >
         {unlocked ? (
-          <div className="font-semibold">✓ Tickets active — show these QR codes in resort.</div>
+          <div className="font-semibold">✓ Tickets active - show these QR codes in resort.</div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

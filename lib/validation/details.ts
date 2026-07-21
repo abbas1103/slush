@@ -17,7 +17,7 @@ export const detailsSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter your date of birth")
       // Reject calendar-impossible dates (e.g. 2010-99-99, 2011-02-30) that the
-      // regex alone lets through — otherwise the server age check sees an
+      // regex alone lets through - otherwise the server age check sees an
       // Invalid Date and NaN < 18 is false, skipping the 18+ gate (audit #4).
       .refine((s) => {
         const [y, m, day] = s.split("-").map(Number);

@@ -2,7 +2,7 @@ import "server-only";
 import type { CrmAdapter, CrmBooking, CrmContact } from "./types";
 
 /**
- * Default adapter until a CRM is confirmed: logs (no PII — ids/refs/amounts
+ * Default adapter until a CRM is confirmed: logs (no PII - ids/refs/amounts
  * only) and treats the event as delivered. Swap in a real adapter by adding a
  * case below and setting CRM_PROVIDER + CRM_API_KEY/CRM_BASE_URL in env.
  */

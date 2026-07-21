@@ -97,7 +97,7 @@ export function PaymentPanel({
         <div>
           <h1>Pay your deposit</h1>
           <p className="mt-2 text-[15px] text-soft">
-            Secure your place with a <Money pence={pricing.depositToday} stripZeros /> deposit —{" "}
+            Secure your place with a <Money pence={pricing.depositToday} stripZeros /> deposit -{" "}
             <Money pence={pricing.damageDeposit} stripZeros /> of it a refundable damage deposit. Pay
             the rest any time before {balanceDueLabel}.
           </p>

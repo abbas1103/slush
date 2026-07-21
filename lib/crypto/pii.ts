@@ -4,7 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 /**
  * App-layer encryption for sensitive PII (passport number, insurer policy,
  * access/medical needs). AES-256-GCM with a server-only key. Ciphertext is
- * stored as `v1:<base64 iv>:<base64 ciphertext+tag>` — the version prefix
+ * stored as `v1:<base64 iv>:<base64 ciphertext+tag>` - the version prefix
  * enables key rotation later. The key never touches the database, so a DB
  * compromise yields ciphertext, not plaintext.
  */

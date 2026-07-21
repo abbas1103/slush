@@ -17,7 +17,7 @@ export type ResolveResult =
 /**
  * Resolve a trip code to a summary for the code-entry screen. Runs server-side
  * (rate-limiting will be layered here once Upstash is configured). The code is
- * validated via the redeem_trip_code RPC — the trip_codes table is never
+ * validated via the redeem_trip_code RPC - the trip_codes table is never
  * exposed to the client.
  */
 export async function resolveTripCode(rawCode: string): Promise<ResolveResult> {

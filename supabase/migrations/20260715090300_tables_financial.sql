@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────
 -- Financial tables. These are written ONLY from the verified Stripe webhook
--- (service-role client) — never from client callbacks. `payments` is an
+-- (service-role client) - never from client callbacks. `payments` is an
 -- append-only ledger that reconciles 1:1 to Stripe per payment intent.
 -- ─────────────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ create table payments (
 );
 create index payments_booking_idx on payments(booking_id);
 create index payments_intent_idx  on payments(stripe_payment_intent_id);
--- one ledger row per (intent, type) — the webhook write-idempotency guard.
+-- one ledger row per (intent, type) - the webhook write-idempotency guard.
 -- A £150 deposit intent yields exactly one 'deposit' + one 'damage_deposit_hold'.
 create unique index payments_intent_type_uidx
   on payments(stripe_payment_intent_id, type)

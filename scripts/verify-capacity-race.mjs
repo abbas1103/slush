@@ -101,7 +101,7 @@ async function main() {
   const bookingB = await startBooking(tokB);
   assert(!!bookingA && !!bookingB && bookingA !== bookingB, "two distinct pending bookings created");
 
-  // Fire both finalizes concurrently — the trips-row FOR UPDATE lock serialises them.
+  // Fire both finalizes concurrently - the trips-row FOR UPDATE lock serialises them.
   await Promise.all([
     rpc("record_payment_and_finalize", { p_booking_id: bookingA, p_intent_id: `pi_race_a_${stamp}`, p_charge_id: "chA", p_kind: "deposit", p_amount_total: 15000 }),
     rpc("record_payment_and_finalize", { p_booking_id: bookingB, p_intent_id: `pi_race_b_${stamp}`, p_charge_id: "chB", p_kind: "deposit", p_amount_total: 15000 }),
@@ -113,7 +113,7 @@ async function main() {
   const statuses = [sA, sB].sort().join("+");
   console.log(`  bookingA=${sA}  bookingB=${sB}  confirmed_count=${cc}`);
   assert(statuses === "confirmed+waitlisted", "exactly one confirmed + one waitlisted");
-  assert(cc === 1, "confirmed_count === 1 (never exceeded capacity — no 301)");
+  assert(cc === 1, "confirmed_count === 1 (never exceeded capacity - no 301)");
 
   console.log("── Test 2: expired hold frees the place ──");
   await cleanup();

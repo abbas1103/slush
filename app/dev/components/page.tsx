@@ -167,7 +167,7 @@ export default function ComponentsPreview() {
       <Section title="Timeline">
         <Timeline
           items={[
-            { title: "Now", desc: "Confirmation emailed — your place is reserved.", now: true },
+            { title: "Now", desc: "Confirmation emailed - your place is reserved.", now: true },
             { title: "Any time", desc: "Pay off your balance in your dashboard." },
             { title: "7 days before", desc: "Your lift pass & event tickets unlock." },
           ]}

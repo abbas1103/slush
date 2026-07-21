@@ -4,9 +4,9 @@
  */
 
 export interface FormatOpts {
-  /** Drop a trailing `.00` — used for compact button labels ("Pay £150"). */
+  /** Drop a trailing `.00` - used for compact button labels ("Pay £150"). */
   stripZeros?: boolean;
-  /** Group thousands ("£1,050.00") — used for large admin sums. */
+  /** Group thousands ("£1,050.00") - used for large admin sums. */
   grouped?: boolean;
 }
 

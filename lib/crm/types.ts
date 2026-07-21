@@ -1,10 +1,10 @@
 /**
  * CRM-agnostic sync contract. Only the fields a CRM needs for a contact +
- * booking record — deliberately NOT passport/DOB/medical (data minimisation).
+ * booking record - deliberately NOT passport/DOB/medical (data minimisation).
  * A concrete CRM (HubSpot / Salesforce / …) implements CrmAdapter.
  */
 export interface CrmContact {
-  externalId: string; // our user id — the stable key for upsert
+  externalId: string; // our user id - the stable key for upsert
   email: string;
   firstName: string | null;
   lastName: string | null;

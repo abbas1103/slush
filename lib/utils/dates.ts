@@ -9,7 +9,7 @@ export function formatDateRange(startISO: string, endISO: string): string {
 
 /** "15 Nov 2026" from a YYYY-MM-DD string. */
 export function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",

@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────
 -- Seed: the first trip (Brumski Christmas Trip) with its code and all extras.
--- Everything here is editable by admins later — nothing about it is hardcoded
+-- Everything here is editable by admins later - nothing about it is hardcoded
 -- in the app. Idempotent via fixed UUIDs + ON CONFLICT, so it is safe to re-run.
 -- Prices in integer pence. Equipment prices are PROVISIONAL (brief: confirm
 -- before launch); Race day / Railjam are TBC.
@@ -16,7 +16,7 @@ values
    '2026-12-12', '2026-12-19', 7, 43900,
    '["7 nights, 3★ accommodation", "Full 6-day Alpe d''Huez lift pass", "Trip tee shirt"]'::jsonb,
    15000, 5000, 10000, '2026-11-15', 300,
-   'Seven nights in Alpe d''Huez with Brumski — 250km of sunny, south-facing pistes for every level, home to the Sarenne, one of the longest black runs in the world. One booking covers your stay, your lift pass and your trip tee.',
+   'Seven nights in Alpe d''Huez with Brumski - 250km of sunny, south-facing pistes for every level, home to the Sarenne, one of the longest black runs in the world. One booking covers your stay, your lift pass and your trip tee.',
    'live')
 on conflict (id) do update set
   name = excluded.name, organiser = excluded.organiser, resort = excluded.resort,
@@ -42,7 +42,7 @@ values
   ('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'equipment', 'Skis / Snowboard only', 'Board or skis, no boots', 5900, false, false, 'equipment_rental', 4, true),
   ('30000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'equipment', 'Boots only', null, 2900, false, false, 'equipment_rental', 5, true),
   ('30000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'equipment', 'Helmet', null, 1500, false, false, 'equipment_rental', 6, true),
-  ('30000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001', 'lessons', 'Ski lessons', '6 hours total — 3 lessons of 2 hours', 9000, false, false, null, 7, true),
+  ('30000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001', 'lessons', 'Ski lessons', '6 hours total - 3 lessons of 2 hours', 9000, false, false, null, 7, true),
   ('30000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001', 'event', 'Opening Après', null, 1100, false, false, null, 8, true),
   ('30000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001', 'event', 'Brumski Club Night', null, 1100, false, false, null, 9, true),
   ('30000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001', 'event', 'Headliner', null, 2000, false, false, null, 10, true),

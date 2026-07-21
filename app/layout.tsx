@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SLUSH — Student Led Uni Ski Holidays",
+  title: "SLUSH - Student Led Uni Ski Holidays",
   description:
-    "Book your student ski trip: view your trip, build your booking, pay a deposit and unlock your lift pass — all in one place.",
+    "Book your student ski trip: view your trip, build your booking, pay a deposit and unlock your lift pass - all in one place.",
 };
 
 export default function RootLayout({

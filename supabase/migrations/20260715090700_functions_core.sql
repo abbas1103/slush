@@ -96,7 +96,7 @@ as $$
 $$;
 
 -- Is the trip effectively full (confirmed + live holds >= capacity)? Returns a
--- boolean only — never a remaining-places count.
+-- boolean only - never a remaining-places count.
 create or replace function public.trip_effective_full(p_trip_id uuid)
 returns boolean
 language sql stable security definer
@@ -323,7 +323,7 @@ begin
   select capacity, confirmed_count into v_capacity, v_confirmed
     from public.trips where id = v_trip for update;
   if v_confirmed >= v_capacity then
-    raise exception 'trip at capacity — increase capacity before converting';
+    raise exception 'trip at capacity - increase capacity before converting';
   end if;
 
   update public.bookings set status = 'converted' where id = p_booking_id;

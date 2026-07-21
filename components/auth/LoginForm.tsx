@@ -62,7 +62,7 @@ export function LoginForm({
 
       {resetDone && !error && (
         <div className="rounded-btn bg-okbg px-3 py-2 text-[13px] text-ok">
-          Your password has been updated — please log in.
+          Your password has been updated - please log in.
         </div>
       )}
 

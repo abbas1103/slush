@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Footer } from "@/components/chrome/Footer";
 
-/** Public chrome for the legal pages (privacy / terms) — no auth required. */
+/** Public chrome for the legal pages (privacy / terms) - no auth required. */
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">

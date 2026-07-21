@@ -3,7 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/types";
 
 /**
- * Service-role Supabase client — BYPASSES RLS. Server-only (the `server-only`
+ * Service-role Supabase client - BYPASSES RLS. Server-only (the `server-only`
  * import fails the build if this is ever pulled into client code). Use ONLY for
  * privileged writes after verifying ownership in code: the Stripe webhook,
  * booking mutations the client can't do directly, admin actions, GDPR jobs.
