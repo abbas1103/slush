@@ -1,11 +1,26 @@
-function FooterCol({ title, items }: { title: string; items: string[] }) {
+import Link from "next/link";
+
+type Item = string | { label: string; href: string };
+
+function FooterCol({ title, items }: { title: string; items: Item[] }) {
   return (
     <div>
       <div className="text-[13px] font-semibold text-white">{title}</div>
       <ul className="mt-3 flex flex-col gap-2 text-[13px] text-white/60">
-        {items.map((i) => (
-          <li key={i}>{i}</li>
-        ))}
+        {items.map((i) => {
+          const label = typeof i === "string" ? i : i.label;
+          return (
+            <li key={label}>
+              {typeof i === "string" ? (
+                label
+              ) : (
+                <Link href={i.href} className="hover:text-white">
+                  {label}
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -27,7 +42,11 @@ export function Footer() {
         <FooterCol title="Help" items={["Contact us", "Manage booking", "Travel info"]} />
         <FooterCol
           title="Legal"
-          items={["Privacy & cookies", "Terms & conditions", "Booking conditions"]}
+          items={[
+            { label: "Privacy & cookies", href: "/privacy" },
+            { label: "Terms & conditions", href: "/terms" },
+            { label: "Booking conditions", href: "/terms#booking" },
+          ]}
         />
       </div>
     </footer>
