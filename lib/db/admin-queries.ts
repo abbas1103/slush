@@ -130,6 +130,16 @@ export interface AdminBookingRow {
   balance: number;
   damageStatus: string | null;
   createdAt: string;
+  /**
+   * Pence refundWaitlist would actually send back: every succeeded ledger row on
+   * the deposit intent, so a pay-in-full waitlister shows trip cost + the damage
+   * deposit rather than a flat GBP 150. null when there is nothing to refund.
+   * Shown in the confirm dialog, because an irreversible refund button that does
+   * not state its amount is how the wrong row gets refunded.
+   */
+  refundableTotal: number | null;
+  /** Pence refundDamage would send back: the deposit less any withholding. */
+  damageRefundAmount: number | null;
 }
 
 export interface AdminBookingsQuery {
@@ -183,7 +193,7 @@ export async function getAdminTripBookings(
     const q = admin
       .from("bookings")
       .select(
-        "id, reference, status, created_at, base_price_at_booking, users(first_name, last_name, email), booking_extras(price_at_booking, quantity), payments(type, amount, status), damage_deposits(status, created_at)",
+        "id, reference, status, created_at, base_price_at_booking, users(first_name, last_name, email), booking_extras(price_at_booking, quantity), payments(type, amount, status, stripe_payment_intent_id), damage_deposits(status, created_at, amount, withheld_amount, stripe_payment_intent_id)",
         { count: "exact" },
       )
       .eq("trip_id", tripId);
@@ -205,8 +215,17 @@ export async function getAdminTripBookings(
     for (const b of batch) {
       const user = b.users as { first_name: string | null; last_name: string | null; email: string } | null;
       const bes = (b.booking_extras as { price_at_booking: number; quantity: number }[]) ?? [];
-      const pays = (b.payments as LedgerRow[]) ?? [];
-      const dd = (b.damage_deposits as { status: string; created_at: string }[]) ?? [];
+      // LedgerRow plus the intent id: the refund figures have to be attributed to
+      // the deposit intent, but computePaidToTrip only needs the LedgerRow half.
+      const pays = (b.payments as (LedgerRow & { stripe_payment_intent_id: string | null })[]) ?? [];
+      const dd =
+        (b.damage_deposits as {
+          status: string;
+          created_at: string;
+          amount: number;
+          withheld_amount: number | null;
+          stripe_payment_intent_id: string | null;
+        }[]) ?? [];
       // The price snapshotted when the place was taken, so a later admin price
       // edit cannot reprice a booking that already exists.
       const basePrice = b.base_price_at_booking ?? trip.base_price;
@@ -216,6 +235,27 @@ export async function getAdminTripBookings(
       // Newest damage_deposits row first - that state machine, not the ledger, is
       // the source of truth for whether the £100 is still held.
       const newestDd = [...dd].sort((a, c) => c.created_at.localeCompare(a.created_at)).at(0);
+      // Mirror what the two refund actions compute, so the confirm dialog names
+      // the figure the server will really send back. refundWaitlist sums the
+      // succeeded rows on the DEPOSIT intent; refundDamage returns the held
+      // amount less any withholding.
+      const depositIntent = pays.find(
+        (p) => p.type === "deposit" && p.status === "succeeded",
+      )?.stripe_payment_intent_id;
+      const capturedOnDeposit = depositIntent
+        ? pays
+            .filter(
+              (p) =>
+                p.stripe_payment_intent_id === depositIntent &&
+                p.status === "succeeded" &&
+                (p.type === "deposit" || p.type === "damage_deposit_hold" || p.type === "balance"),
+            )
+            .reduce((s, p) => s + p.amount, 0)
+        : 0;
+      const damageRefundable =
+        newestDd && newestDd.status === "held"
+          ? newestDd.amount - (newestDd.withheld_amount ?? 0)
+          : null;
       rows.push({
         id: b.id,
         reference: b.reference,
@@ -228,6 +268,8 @@ export async function getAdminTripBookings(
         // debtor into the finance CSV for every refunded waitlister.
         balance: terminal ? 0 : tripCost - paidToTrip,
         damageStatus: newestDd?.status ?? null,
+        refundableTotal: capturedOnDeposit > 0 ? capturedOnDeposit : null,
+        damageRefundAmount: damageRefundable,
         createdAt: b.created_at,
       });
     }

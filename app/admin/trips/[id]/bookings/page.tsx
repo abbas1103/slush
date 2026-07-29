@@ -97,7 +97,15 @@ export default async function AdminBookingsPage({
               <dd className="text-right">{r.damageStatus ?? "-"}</dd>
             </dl>
             <div className="mt-3">
-              <BookingActions bookingId={r.id} tripId={id} status={r.status} damageStatus={r.damageStatus} />
+              <BookingActions
+                    bookingId={r.id}
+                    tripId={id}
+                    status={r.status}
+                    damageStatus={r.damageStatus}
+                    reference={r.reference}
+                    refundableTotal={r.refundableTotal}
+                    damageRefundAmount={r.damageRefundAmount}
+                  />
             </div>
           </Card>
         ))}
@@ -142,7 +150,15 @@ export default async function AdminBookingsPage({
                 </td>
                 <td className="p-2">{r.damageStatus ?? "-"}</td>
                 <td className="p-2">
-                  <BookingActions bookingId={r.id} tripId={id} status={r.status} damageStatus={r.damageStatus} />
+                  <BookingActions
+                    bookingId={r.id}
+                    tripId={id}
+                    status={r.status}
+                    damageStatus={r.damageStatus}
+                    reference={r.reference}
+                    refundableTotal={r.refundableTotal}
+                    damageRefundAmount={r.damageRefundAmount}
+                  />
                 </td>
               </tr>
             ))}

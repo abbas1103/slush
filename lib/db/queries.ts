@@ -127,6 +127,10 @@ export async function getBookingContext(
   bookingId: string,
 ): Promise<BookingContext | null> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
@@ -134,6 +138,12 @@ export async function getBookingContext(
       "id, trip_id, status, reference, insurance_choice, insurance_details, access_needs, base_price_at_booking",
     )
     .eq("id", bookingId)
+    // Filter on ownership rather than leaning on RLS alone. This row carries the
+    // insurance declaration and the encrypted access/medical needs, and an admin
+    // policy spans every booking - so an MFA'd admin session hitting a checkout
+    // URL would otherwise read another student's Article 9 data. Same defect
+    // class as getMyBooking below: RLS is the backstop, not the filter.
+    .eq("user_id", user.id)
     .maybeSingle();
   assertRead(bookingError, "your booking");
   if (!booking) return null;
