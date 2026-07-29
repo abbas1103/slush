@@ -23,7 +23,12 @@ export function MetricTile({ label, value, sub, dark, className }: MetricTilePro
       <div className={cn("text-[12.5px]", dark ? "text-white/70" : "text-soft")}>
         {label}
       </div>
-      <div className="mt-1 text-[24px] font-extrabold tabular-nums">{value}</div>
+      {/* Below sm the tiles are two to a row, where a formatted date ("15 Nov
+          2026") does not fit on one line at 24px - the prototype dropped that
+          tile to 20px. Scaling the whole row keeps it consistent. */}
+      <div className="mt-1 text-[clamp(16px,5vw,20px)] font-extrabold tabular-nums sm:text-[24px]">
+        {value}
+      </div>
       {sub && (
         <div className={cn("text-[11.5px]", dark ? "text-white/60" : "text-soft")}>
           {sub}

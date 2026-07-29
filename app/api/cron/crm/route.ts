@@ -3,6 +3,14 @@ import { processCrmOutbox } from "@/lib/crm/process";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/**
+ * Declared explicitly rather than inherited. The drain's wall-clock budget is set
+ * against this number, and relying on the platform default meant the budget was
+ * guessing: on Hobby the default is 10s, so 60 gives the drain room to clear a
+ * launch-day backlog in one run instead of a handful of events. Raise both this
+ * and DEFAULT_BUDGET_MS in lib/crm/process.ts together, never one alone.
+ */
+export const maxDuration = 60;
 
 /**
  * CRM outbox drain. Protected by CRON_SECRET (Vercel Cron sends it as a Bearer

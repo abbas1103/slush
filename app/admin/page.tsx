@@ -1,16 +1,20 @@
 import Link from "next/link";
-import { getAdminTrips } from "@/lib/db/admin-queries";
+import { getAdminTrips, getOpenReconciliations } from "@/lib/db/admin-queries";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
 import { buttonVariants } from "@/components/ui/Button";
-import { formatDateRange } from "@/lib/utils/dates";
+import { formatDate, formatDateRange } from "@/lib/utils/dates";
 import { requireAdminMfa } from "@/lib/auth/guards";
 
 export default async function AdminHome() {
   await requireAdminMfa();
-  const trips = await getAdminTrips();
+  const [trips, reconciliations] = await Promise.all([
+    getAdminTrips(),
+    getOpenReconciliations(),
+  ]);
   const totalExposure = trips.reduce((s, t) => s + t.exposure, 0);
+  const stranded = reconciliations.reduce((s, r) => s + r.amount, 0);
 
   return (
     <div>
@@ -20,6 +24,48 @@ export default async function AdminHome() {
           + New trip
         </Link>
       </div>
+
+      {reconciliations.length > 0 && (
+        <Card className="mt-4 border-2 border-err">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-err">
+              {reconciliations.length} payment{reconciliations.length === 1 ? "" : "s"} need
+              {reconciliations.length === 1 ? "s" : ""} reconciling
+            </h3>
+            <div className="text-[20px] font-extrabold text-err">
+              <Money pence={stranded} grouped />
+            </div>
+          </div>
+          <p className="mt-1 text-[12.5px] text-soft">
+            Money Stripe captured that could not be placed against a booking. Each one needs a
+            refund or a manual fix in Stripe - it will not resolve on its own.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-line text-left text-soft">
+                  <th className="p-2 font-medium">Booking</th>
+                  <th className="p-2 font-medium">Reason</th>
+                  <th className="p-2 font-medium">Payment intent</th>
+                  <th className="p-2 text-right font-medium">Amount</th>
+                  <th className="p-2 font-medium">Since</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reconciliations.map((r) => (
+                  <tr key={r.id} className="border-b border-line last:border-0">
+                    <td className="p-2 font-medium">{r.reference ?? r.bookingId}</td>
+                    <td className="p-2">{r.reason}</td>
+                    <td className="p-2 font-mono text-[12px] break-all">{r.intentId}</td>
+                    <td className="p-2 text-right"><Money pence={r.amount} /></td>
+                    <td className="p-2 whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {totalExposure > 0 && (
         <Card className="mt-4" tone="dark">

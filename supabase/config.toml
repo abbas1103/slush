@@ -299,9 +299,14 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
+# Mirrors the hosted project, where TOTP is Enabled. Admin RLS gates on
+# public.is_admin_mfa() (JWT aal = aal2) from
+# 20260729000300_rls_mfa_and_constraints.sql, so leaving these false locally
+# means no local session can reach aal2 and `supabase db reset` hands you an
+# admin who can read nothing. Keep both true so admin MFA is testable locally.
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

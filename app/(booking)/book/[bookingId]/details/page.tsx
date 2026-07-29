@@ -13,29 +13,37 @@ export default async function DetailsPage({
   params: Promise<{ bookingId: string }>;
 }) {
   const { bookingId } = await params;
-  const ctx = await getBookingContext(bookingId);
+  const supabase = await createClient();
+
+  // Wave 1 - the context, the session user and the booking's insurance_details
+  // (not part of BookingContext) are independent of each other.
+  const [ctx, userRes, bookingRow] = await Promise.all([
+    getBookingContext(bookingId),
+    supabase.auth.getUser(),
+    supabase
+      .from("bookings")
+      .select("insurance_details")
+      .eq("id", bookingId)
+      .maybeSingle(),
+  ]);
   if (!ctx) notFound();
   if (ctx.booking.status !== "pending") redirect("/");
+  if (bookingRow.error) throw new Error(bookingRow.error.message);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", user!.id)
-    .maybeSingle();
-  const { data: emergency } = await supabase
-    .from("emergency_contacts")
-    .select("*")
-    .eq("user_id", user!.id)
-    .maybeSingle();
-  const { data: bookingRow } = await supabase
-    .from("bookings")
-    .select("insurance_details")
-    .eq("id", bookingId)
-    .maybeSingle();
+  // The layout already required a verified user; re-check here rather than
+  // assume it (CLAUDE.md: never rely on the layer above alone).
+  const user = userRes.data.user;
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/book/${bookingId}/details`)}`);
+
+  // Wave 2 - both keyed on the user we just resolved.
+  const [profileRes, emergencyRes] = await Promise.all([
+    supabase.from("users").select("*").eq("id", user.id).maybeSingle(),
+    supabase.from("emergency_contacts").select("*").eq("user_id", user.id).maybeSingle(),
+  ]);
+  if (profileRes.error) throw new Error(profileRes.error.message);
+  if (emergencyRes.error) throw new Error(emergencyRes.error.message);
+  const profile = profileRes.data;
+  const emergency = emergencyRes.data;
 
   const coverExtra = ctx.extras.find((e) => e.type === "other") ?? null;
   const coverPrice = coverExtra?.price ?? 0;
@@ -51,14 +59,15 @@ export default async function DetailsPage({
     };
   });
   const basePricing = computePricing({
-    basePrice: ctx.trip.base_price,
+    // Snapshot, not the live trip price - see the payment page for why.
+    basePrice: ctx.booking.base_price_at_booking ?? ctx.trip.base_price,
     depositAmount: ctx.trip.deposit_amount,
     downpaymentAmount: ctx.trip.downpayment_amount,
     damageDepositAmount: ctx.trip.damage_deposit_amount,
     extras: lineItems,
   });
 
-  const insDetails = (bookingRow?.insurance_details ?? null) as
+  const insDetails = (bookingRow.data?.insurance_details ?? null) as
     | { insurer?: string; policy?: string; emergency_line?: string }
     | null;
 
@@ -89,7 +98,7 @@ export default async function DetailsPage({
         bookingId={bookingId}
         tripName={ctx.trip.name}
         tripMeta={`${ctx.trip.resort} · ${formatDateRange(ctx.trip.start_date, ctx.trip.end_date)} · 1 place`}
-        email={user!.email ?? ""}
+        email={user.email ?? ""}
         basePricing={basePricing}
         coverPrice={coverPrice}
         initial={initial}

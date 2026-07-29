@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveDetails } from "@/app/(booking)/book/actions";
-import type { DetailsInput } from "@/lib/validation/details";
+import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
 import type { Pricing } from "@/lib/pricing/compute";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -46,8 +47,10 @@ interface Props {
 
 export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing, coverPrice, initial }: Props) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState(false);
   const [f, setF] = useState<DetailsInitial>(initial);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [shareAccessNeeds, setShareAccessNeeds] = useState(false);
@@ -71,45 +74,89 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
 
   const canContinue = declAge && declFit && declTerms;
 
+  const input: DetailsInput = {
+    title: f.title,
+    firstName: f.firstName,
+    lastName: f.lastName,
+    universitySociety: f.universitySociety,
+    studentId: f.studentId,
+    dob: f.dob,
+    nationality: f.nationality,
+    passportNumber: f.passport,
+    phone: f.phone,
+    emergencyName: f.emergencyName,
+    emergencyRelationship: f.emergencyRelationship,
+    emergencyPhone: f.emergencyPhone,
+    accessNeeds: f.accessNeeds,
+    marketingOptIn,
+    insuranceChoice: f.insuranceChoice,
+    insurer: f.insurer,
+    policyNumber: f.policyNumber,
+    insuranceEmergencyLine: f.insuranceEmergencyLine,
+    shareAccessNeeds,
+    declAge,
+    declFit,
+    declTerms,
+  };
+
+  // Checked in the browser against the SAME schema the server uses, so a
+  // student sees every problem at once, on the control that caused it, instead
+  // of one anonymous message per round trip (audit #79). Only once they've tried
+  // to submit, so the form isn't red before they've started, and re-checked on
+  // every keystroke after that so a message clears as soon as it's fixed.
+  const parsed = detailsSchema.safeParse(input);
+  const fieldErrors: Record<string, string> = {};
+  if (attempted && !parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+  }
+
+  /** The field's message, with an id so its control can point at it. */
+  const fieldError = (name: string) =>
+    fieldErrors[name] ? <span id={`${name}-error`}>{fieldErrors[name]}</span> : undefined;
+
+  /** Screen-reader wiring for the control itself. */
+  const errorProps = (name: string): { "aria-invalid"?: true; "aria-describedby"?: string } =>
+    fieldErrors[name] ? { "aria-invalid": true, "aria-describedby": `${name}-error` } : {};
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const input: DetailsInput = {
-      title: f.title,
-      firstName: f.firstName,
-      lastName: f.lastName,
-      universitySociety: f.universitySociety,
-      studentId: f.studentId,
-      dob: f.dob,
-      nationality: f.nationality,
-      passportNumber: f.passport,
-      phone: f.phone,
-      emergencyName: f.emergencyName,
-      emergencyRelationship: f.emergencyRelationship,
-      emergencyPhone: f.emergencyPhone,
-      accessNeeds: f.accessNeeds,
-      marketingOptIn,
-      insuranceChoice: f.insuranceChoice,
-      insurer: f.insurer,
-      policyNumber: f.policyNumber,
-      insuranceEmergencyLine: f.insuranceEmergencyLine,
-      shareAccessNeeds,
-      declAge,
-      declFit,
-      declTerms,
-    };
+    setAttempted(true);
+
+    if (!parsed.success) {
+      const issues = parsed.error.issues;
+      setError(
+        issues.length > 1
+          ? "Please check the highlighted fields."
+          : (issues[0]?.message ?? "Please check your details."),
+      );
+      // Move focus to the first field at fault - a message on its own leaves a
+      // keyboard or screen-reader user with nothing to act on.
+      const first = String(issues[0]?.path[0] ?? "");
+      formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
+      return;
+    }
+
     startTransition(async () => {
-      const r = await saveDetails(bookingId, input);
-      if (!r.ok) {
-        setError(r.error);
-        return;
+      try {
+        const r = await saveDetails(bookingId, input);
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
+        router.push(`/book/${bookingId}/payment`);
+      } catch {
+        // A dropped request must never look like a saved one.
+        setError("Couldn't save your details - please check your connection and try again.");
       }
-      router.push(`/book/${bookingId}/payment`);
     });
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto grid max-w-[1120px] gap-8 px-6 py-8 xl:grid-cols-[1fr_360px]">
+    <form ref={formRef} onSubmit={onSubmit} className="mx-auto grid max-w-[1120px] gap-8 px-6 py-8 xl:grid-cols-[1fr_360px]">
       <div className="flex flex-col gap-4">
         <div>
           <h1>Your details</h1>
@@ -122,50 +169,107 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
         <Card>
           <h3>About you</h3>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Field label="Title">
-              <Select value={f.title} onChange={set("title")}>
+            <Field label="Title" error={fieldError("title")}>
+              <Select
+                name="title"
+                value={f.title}
+                onChange={set("title")}
+                required
+                {...errorProps("title")}
+              >
                 <option value="">Select</option>
                 <option>Mr</option>
                 <option>Ms</option>
                 <option>Mx</option>
               </Select>
             </Field>
-            <Field label="First name(s)">
-              <Input value={f.firstName} onChange={set("firstName")} required />
+            <Field label="First name(s)" error={fieldError("firstName")}>
+              <Input
+                name="firstName"
+                value={f.firstName}
+                onChange={set("firstName")}
+                required
+                {...errorProps("firstName")}
+              />
             </Field>
-            <Field label="Last name">
-              <Input value={f.lastName} onChange={set("lastName")} required />
+            <Field label="Last name" error={fieldError("lastName")}>
+              <Input
+                name="lastName"
+                value={f.lastName}
+                onChange={set("lastName")}
+                required
+                {...errorProps("lastName")}
+              />
             </Field>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="University / Society">
-              <Input value={f.universitySociety} onChange={set("universitySociety")} />
+            <Field label="University / Society" error={fieldError("universitySociety")}>
+              <Input
+                name="universitySociety"
+                value={f.universitySociety}
+                onChange={set("universitySociety")}
+                {...errorProps("universitySociety")}
+              />
             </Field>
-            <Field label="Student ID / membership no.">
-              <Input value={f.studentId} onChange={set("studentId")} />
+            <Field label="Student ID / membership no." error={fieldError("studentId")}>
+              <Input
+                name="studentId"
+                value={f.studentId}
+                onChange={set("studentId")}
+                {...errorProps("studentId")}
+              />
             </Field>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Field label="Date of birth">
-              <Input type="date" value={f.dob} onChange={set("dob")} required />
+            <Field label="Date of birth" error={fieldError("dob")}>
+              <Input
+                name="dob"
+                type="date"
+                value={f.dob}
+                onChange={set("dob")}
+                required
+                {...errorProps("dob")}
+              />
             </Field>
-            <Field label="Nationality">
-              <Select value={f.nationality} onChange={set("nationality")}>
+            <Field label="Nationality" error={fieldError("nationality")}>
+              <Select
+                name="nationality"
+                value={f.nationality}
+                onChange={set("nationality")}
+                required
+                {...errorProps("nationality")}
+              >
                 <option value="">Select</option>
                 <option>British</option>
                 <option>Other</option>
               </Select>
             </Field>
-            <Field label="Passport number" hint="Stored encrypted">
-              <Input value={f.passport} onChange={set("passport")} required />
+            <Field
+              label="Passport number"
+              hint="Stored encrypted"
+              error={fieldError("passportNumber")}
+            >
+              <Input
+                name="passportNumber"
+                value={f.passport}
+                onChange={set("passport")}
+                required
+                {...errorProps("passportNumber")}
+              />
             </Field>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Email address">
               <Input value={email} disabled />
             </Field>
-            <Field label="Mobile number">
-              <Input value={f.phone} onChange={set("phone")} required />
+            <Field label="Mobile number" error={fieldError("phone")}>
+              <Input
+                name="phone"
+                value={f.phone}
+                onChange={set("phone")}
+                required
+                {...errorProps("phone")}
+              />
             </Field>
           </div>
         </Card>
@@ -174,14 +278,31 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
           <h3>Emergency contact</h3>
           <p className="mt-1 text-[13px] text-soft">Someone we can reach if needed while you&apos;re away.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Field label="Full name">
-              <Input value={f.emergencyName} onChange={set("emergencyName")} required />
+            <Field label="Full name" error={fieldError("emergencyName")}>
+              <Input
+                name="emergencyName"
+                value={f.emergencyName}
+                onChange={set("emergencyName")}
+                required
+                {...errorProps("emergencyName")}
+              />
             </Field>
-            <Field label="Relationship">
-              <Input value={f.emergencyRelationship} onChange={set("emergencyRelationship")} />
+            <Field label="Relationship" error={fieldError("emergencyRelationship")}>
+              <Input
+                name="emergencyRelationship"
+                value={f.emergencyRelationship}
+                onChange={set("emergencyRelationship")}
+                {...errorProps("emergencyRelationship")}
+              />
             </Field>
-            <Field label="Contact number">
-              <Input value={f.emergencyPhone} onChange={set("emergencyPhone")} required />
+            <Field label="Contact number" error={fieldError("emergencyPhone")}>
+              <Input
+                name="emergencyPhone"
+                value={f.emergencyPhone}
+                onChange={set("emergencyPhone")}
+                required
+                {...errorProps("emergencyPhone")}
+              />
             </Field>
           </div>
         </Card>
@@ -191,13 +312,24 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
           <p className="mt-1 text-[13px] text-soft">Medical or access requirements - optional.</p>
           <Textarea
             className="mt-3"
+            name="accessNeeds"
             rows={3}
             value={f.accessNeeds}
             onChange={set("accessNeeds")}
             placeholder="e.g. ground-floor room, medication, access needs…"
+            {...errorProps("accessNeeds")}
           />
+          {fieldErrors.accessNeeds && (
+            <p id="accessNeeds-error" className="mt-1.5 text-[12.5px] text-err">
+              {fieldErrors.accessNeeds}
+            </p>
+          )}
           <div className="mt-3">
-            <Checkbox checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)}>
+            <Checkbox
+              name="marketingOptIn"
+              checked={marketingOptIn}
+              onChange={(e) => setMarketingOptIn(e.target.checked)}
+            >
               Send me the resort guide and trip updates by email.
             </Checkbox>
           </div>
@@ -215,14 +347,31 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
             />
             {f.insuranceChoice === "own" && (
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Insurer">
-                  <Input value={f.insurer} onChange={set("insurer")} />
+                <Field label="Insurer" error={fieldError("insurer")}>
+                  <Input
+                    name="insurer"
+                    value={f.insurer}
+                    onChange={set("insurer")}
+                    required
+                    {...errorProps("insurer")}
+                  />
                 </Field>
-                <Field label="Policy number">
-                  <Input value={f.policyNumber} onChange={set("policyNumber")} />
+                <Field label="Policy number" error={fieldError("policyNumber")}>
+                  <Input
+                    name="policyNumber"
+                    value={f.policyNumber}
+                    onChange={set("policyNumber")}
+                    required
+                    {...errorProps("policyNumber")}
+                  />
                 </Field>
-                <Field label="Emergency line">
-                  <Input value={f.insuranceEmergencyLine} onChange={set("insuranceEmergencyLine")} />
+                <Field label="Emergency line" error={fieldError("insuranceEmergencyLine")}>
+                  <Input
+                    name="insuranceEmergencyLine"
+                    value={f.insuranceEmergencyLine}
+                    onChange={set("insuranceEmergencyLine")}
+                    {...errorProps("insuranceEmergencyLine")}
+                  />
                 </Field>
               </div>
             )}
@@ -237,18 +386,42 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
 
         <Card>
           <h3>Declarations &amp; terms</h3>
-          <p className="mt-1 text-[13px] text-soft">Please confirm the following to complete your booking.</p>
+          <p className="mt-1 text-[13px] text-soft">
+            Please confirm the following to complete your booking. The terms open in a new tab, so
+            nothing you&apos;ve typed is lost.
+          </p>
           <div className="mt-3 flex flex-col gap-3">
-            <Checkbox checked={declAge} onChange={(e) => setDeclAge(e.target.checked)}>
+            <Checkbox name="declAge" checked={declAge} onChange={(e) => setDeclAge(e.target.checked)}>
               I confirm I will be 18 or over on arrival in resort.
             </Checkbox>
-            <Checkbox checked={declFit} onChange={(e) => setDeclFit(e.target.checked)}>
+            <Checkbox name="declFit" checked={declFit} onChange={(e) => setDeclFit(e.target.checked)}>
               I am fit to travel and have disclosed any medical or access needs above.
             </Checkbox>
-            <Checkbox checked={declTerms} onChange={(e) => setDeclTerms(e.target.checked)}>
-              I have read and accept the Booking Conditions, Refund Policy and Trip Terms.
+            <Checkbox name="declTerms" checked={declTerms} onChange={(e) => setDeclTerms(e.target.checked)}>
+              {/* Linked at the point of consent: a student can't accept documents
+                  they have no way of reading from inside the flow (audit #33). */}
+              I have read and accept the{" "}
+              <Link href="/terms#booking" target="_blank" rel="noopener" className="underline">
+                Booking Conditions
+              </Link>
+              , the{" "}
+              {/* #cancellations is the id the terms page defines; #refunds
+                  resolved nowhere, so this landed the student at the top of the
+                  document at the exact moment they consent. */}
+              <Link href="/terms#cancellations" target="_blank" rel="noopener" className="underline">
+                Refund Policy
+              </Link>{" "}
+              and the{" "}
+              <Link href="/terms" target="_blank" rel="noopener" className="underline">
+                Trip Terms
+              </Link>
+              .
             </Checkbox>
-            <Checkbox checked={shareAccessNeeds} onChange={(e) => setShareAccessNeeds(e.target.checked)}>
+            <Checkbox
+              name="shareAccessNeeds"
+              checked={shareAccessNeeds}
+              onChange={(e) => setShareAccessNeeds(e.target.checked)}
+            >
               I&apos;d like SLUSH to share my access needs with the resort.
             </Checkbox>
           </div>
@@ -260,7 +433,11 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
           <div className="mt-3 rounded-btn bg-soft-panel px-3 py-2 text-center text-[13px] text-ink-2">
             🔒 Pay <Money pence={pricing.depositToday} stripZeros /> deposit today
           </div>
-          {error && <p className="mt-2 text-[13px] text-err">{error}</p>}
+          {error && (
+            <p role="alert" className="mt-2 rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">
+              {error}
+            </p>
+          )}
           <Button type="submit" className="mt-3 w-full" disabled={pending || !canContinue}>
             {pending ? "Saving…" : "Continue to payment →"}
           </Button>

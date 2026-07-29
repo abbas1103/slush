@@ -46,7 +46,8 @@ export default async function ExtrasPage({
     };
   });
   const pricing = computePricing({
-    basePrice: ctx.trip.base_price,
+    // Snapshot, not the live trip price - see the payment page for why.
+    basePrice: ctx.booking.base_price_at_booking ?? ctx.trip.base_price,
     depositAmount: ctx.trip.deposit_amount,
     downpaymentAmount: ctx.trip.downpayment_amount,
     damageDepositAmount: ctx.trip.damage_deposit_amount,

@@ -15,20 +15,38 @@ export function CodeManager({ tripId, codes }: { tripId: string; codes: Code[] }
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   async function add() {
     if (!code.trim()) return;
     setBusy(true);
     setErr(null);
-    const r = await addTripCode(tripId, code);
-    setBusy(false);
-    if (!r.ok) return setErr(r.error);
-    setCode("");
-    router.refresh();
+    try {
+      const r = await addTripCode(tripId, code);
+      if (!r.ok) return setErr(r.error);
+      setCode("");
+      router.refresh();
+    } catch {
+      setErr("Could not add the code. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
+  // A failed toggle used to look exactly like a success: the result was discarded and
+  // the pill simply did not flip, so a leaked code could stay live and redeemable
+  // while the admin believed it was off (audit #125).
   async function toggle(id: string, active: boolean) {
-    await setTripCodeActive(id, tripId, active);
-    router.refresh();
+    setTogglingId(id);
+    setErr(null);
+    try {
+      const r = await setTripCodeActive(id, tripId, active);
+      if (!r.ok) return setErr(r.error);
+      router.refresh();
+    } catch {
+      setErr("Could not change the code. It may still be live - reload and check.");
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
@@ -40,8 +58,8 @@ export function CodeManager({ tripId, codes }: { tripId: string; codes: Code[] }
             <span className="font-mono text-[14px]">{c.code}</span>
             <div className="flex items-center gap-2">
               <Pill variant={c.active ? "success" : "tag"} dot={c.active}>{c.active ? "active" : "inactive"}</Pill>
-              <Button size="sm" variant="out" onClick={() => toggle(c.id, !c.active)}>
-                {c.active ? "Deactivate" : "Activate"}
+              <Button size="sm" variant="out" onClick={() => toggle(c.id, !c.active)} disabled={togglingId === c.id}>
+                {togglingId === c.id ? "Saving…" : c.active ? "Deactivate" : "Activate"}
               </Button>
             </div>
           </div>
@@ -52,7 +70,7 @@ export function CodeManager({ tripId, codes }: { tripId: string; codes: Code[] }
         <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="NEW-CODE-26" className="flex-1" />
         <Button variant="out" onClick={add} disabled={busy}>Add code</Button>
       </div>
-      {err && <p className="text-[13px] text-err">{err}</p>}
+      {err && <p role="alert" className="text-[13px] text-err">{err}</p>}
     </Card>
   );
 }

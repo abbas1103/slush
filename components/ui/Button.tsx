@@ -18,7 +18,9 @@ export const buttonVariants = cva(
       },
       size: {
         default: "px-[22px] py-[13px] text-[15px]",
-        sm: "px-4 py-2 text-[13px]",
+        // 35.5px tall, so on a touch pointer it grows to the 44px target floor.
+        // Desktop stays pixel-identical to the prototype.
+        sm: "px-4 py-2 text-[13px] [@media(pointer:coarse)]:min-h-11",
       },
       pill: {
         true: "rounded-full",

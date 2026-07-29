@@ -1,7 +1,18 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+export const metadata: Metadata = {
+  // Sign-in, sign-up and password-reset pages have nothing to offer a crawler.
+  robots: { index: false, follow: false },
+};
+
 /**
  * Split-screen auth shell (login / signup / reset): dark brand panel on the
- * left (hidden below the lg breakpoint), form on the right. Mirrors the
- * prototype's .login-wrap.
+ * left, form on the right. Mirrors the prototype's .login-wrap - below the lg
+ * breakpoint the split collapses to a single column and the panel becomes a
+ * compact banner above the form (smaller padding and headline, no mountains)
+ * rather than disappearing, so phone users still get the wordmark and a route
+ * to the legal pages.
  */
 export default function AuthLayout({
   children,
@@ -9,26 +20,36 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      <aside className="relative hidden overflow-hidden bg-panel px-12 py-14 text-white lg:flex lg:flex-col lg:justify-between">
+    <div className="flex min-h-dvh flex-col lg:grid lg:grid-cols-2">
+      <aside className="relative flex flex-col gap-6 overflow-hidden bg-panel px-6 py-8 text-white lg:justify-between lg:px-12 lg:py-14">
         <div className="text-[22px] font-extrabold tracking-tight">SLUSH</div>
         <div className="relative z-10">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
             ❄ Brumski Christmas Trip · 2026
           </span>
-          <h1 className="mt-5 max-w-sm text-[44px] font-extrabold leading-[1.05]">
+          {/* Brand copy, not the page heading - the form's own h1 ("Log in")
+              stays the only h1 now that the panel shows on phones too. */}
+          <p className="mt-5 max-w-sm text-[28px] font-extrabold leading-[1.05] tracking-[-0.02em] lg:text-[44px]">
             Your trip
             <br />
             starts here.
-          </h1>
-          <p className="mt-4 max-w-sm text-[15px] text-white/70">
+          </p>
+          <p className="mt-4 max-w-sm text-[14px] text-white/70 lg:text-[15px]">
             Log in to enter your trip code, build your booking and grab your
             lift pass - all in one place.
           </p>
         </div>
+        <div className="relative z-10 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-white/60">
+          <Link href="/privacy" className="hover:text-white">
+            Privacy &amp; cookies
+          </Link>
+          <Link href="/terms" className="hover:text-white">
+            Terms &amp; conditions
+          </Link>
+        </div>
         <svg
           viewBox="0 0 600 200"
-          className="pointer-events-none absolute inset-x-0 bottom-0 w-full text-white"
+          className="pointer-events-none absolute inset-x-0 bottom-0 hidden w-full text-white lg:block"
           fill="currentColor"
           aria-hidden
         >
@@ -37,7 +58,7 @@ export default function AuthLayout({
         </svg>
       </aside>
 
-      <main className="flex items-center justify-center px-6 py-12">{children}</main>
+      <main className="flex flex-1 items-center justify-center px-6 py-12">{children}</main>
     </div>
   );
 }

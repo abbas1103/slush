@@ -1,12 +1,36 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache, type ReactNode } from "react";
 import { getTripByCode } from "@/lib/db/queries";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { TripTabs } from "@/components/booking/TripTabs";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
-import { formatDateRange } from "@/lib/utils/dates";
+import { formatDate, formatDateRange } from "@/lib/utils/dates";
 import { BookButton } from "@/components/booking/BookButton";
+
+/** One trip read per request, shared by generateMetadata and the page. */
+const loadTrip = cache(getTripByCode);
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}): Promise<Metadata> {
+  const { code } = await params;
+  const detail = await loadTrip(decodeURIComponent(code));
+  // The whole booking flow sits behind requireUser, so noindex is belt-and-braces.
+  // The title is what stops three open booking tabs looking identical.
+  const robots = { index: false, follow: false };
+  if (!detail) return { title: "Your trip - SLUSH", robots };
+  return {
+    title: `${detail.trip.name} - SLUSH`,
+    description: detail.trip.description ?? undefined,
+    robots,
+  };
+}
 
 export default async function TripDetailPage({
   params,
@@ -15,7 +39,7 @@ export default async function TripDetailPage({
 }) {
   const { code } = await params;
   const tripCode = decodeURIComponent(code);
-  const detail = await getTripByCode(tripCode);
+  const detail = await loadTrip(tripCode);
   if (!detail) notFound();
 
   const { trip, extras, isFull } = detail;
@@ -25,6 +49,32 @@ export default async function TripDetailPage({
     ? (trip.base_inclusions as string[])
     : [];
   const dateRange = formatDateRange(trip.start_date, trip.end_date);
+
+  // Every row comes from the trips row. Service levels the CMS has no field for
+  // (check-in time, in-resort cover) are not promised here, and cancellation
+  // points at the booking conditions rather than restating a policy.
+  const goodToKnow: [string, ReactNode][] = [
+    ["Resort", `${trip.resort}, ${trip.country}`],
+    ["Dates", `${dateRange} · ${trip.nights} nights`],
+    ["Deposit", <Money key="deposit" pence={trip.deposit_amount} stripZeros />],
+    [
+      "Balance due",
+      trip.balance_due_date ? formatDate(trip.balance_due_date) : "Before you travel",
+    ],
+    [
+      "Cancellation",
+      // #cancellations, not #booking: the latter is "Booking & payment", so the
+      // Cancellation row was linking a student to the wrong section.
+      <Link key="cancellation" href="/terms#cancellations" className="underline hover:no-underline">
+        Cancellations &amp; refunds
+      </Link>,
+    ],
+    ["Trip run by", `${trip.organiser}, via SLUSH`],
+    // saveDetails hard-rejects anyone under 18 on the arrival date, so a student
+    // can otherwise reach the details step, fill in a passport number and only
+    // then be refused. This is the one place they see it before committing.
+    ["Age", "18+ on arrival in resort"],
+  ];
 
   return (
     <>
@@ -94,23 +144,18 @@ export default async function TripDetailPage({
           <section id="stay" className="scroll-mt-24 border-b border-line py-6">
             <h3>Where you&apos;ll stay</h3>
             <p className="mt-2 text-[14px] text-ink-2">
-              3★ chalet-style apartment - shared, close to the lifts and the main
-              strip, bed linen included.
+              {trip.nights} nights in {trip.resort}, {trip.country} ({dateRange}).
             </p>
-            <p className="mt-1 text-[12.5px] text-soft">Allocated on arrival.</p>
+            <p className="mt-1 text-[12.5px] text-soft">
+              Your accommodation is arranged by {trip.organiser} and is listed in
+              what&apos;s included above.
+            </p>
           </section>
 
           <section id="location" className="scroll-mt-24 py-6">
             <h3>Good to know</h3>
             <div className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
-              {[
-                ["Age requirement", "18+ on arrival"],
-                ["Check-in", "From 16:00"],
-                ["Cancellation", "Free within 24 hrs"],
-                ["Resort", trip.resort],
-                ["Support", "24/7 in-resort team"],
-                ["Trip run by", `${trip.organiser}, via SLUSH`],
-              ].map(([k, v]) => (
+              {goodToKnow.map(([k, v]) => (
                 <div
                   key={k}
                   className="flex justify-between gap-4 border-b border-line-2 py-2 text-[14px]"
@@ -158,7 +203,10 @@ export default async function TripDetailPage({
               )}
               <BookButton code={tripCode} isFull={isFull} />
               <p className="mt-2 text-center text-[12px] text-soft">
-                Free cancellation within 24 hours · One place per booking
+                One place per booking ·{" "}
+                <Link href="/terms#booking" className="underline hover:no-underline">
+                  Booking conditions
+                </Link>
               </p>
             </div>
           </Card>

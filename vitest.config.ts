@@ -13,5 +13,12 @@ export default defineConfig({
     environment: "node",
     include: ["**/*.test.ts"],
     exclude: ["node_modules/**", ".next/**"],
+    env: {
+      // lib/stripe/server.ts fails closed on a missing key at module load, so a
+      // test that imports anything touching it needs these present. Unit tests
+      // never reach Stripe - the client is mocked - so placeholders are enough.
+      STRIPE_SECRET_KEY: "sk_test_placeholder",
+      STRIPE_WEBHOOK_SECRET: "whsec_placeholder",
+    },
   },
 });

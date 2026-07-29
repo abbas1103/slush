@@ -18,7 +18,12 @@ export function TripTabs() {
 
   function go(id: string) {
     setActive(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // An explicit behavior:"smooth" beats the CSS scroll-behavior, so the
+    // reduced-motion preference has to be honoured here too (audit #128).
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }
 
   return (

@@ -30,6 +30,12 @@ export function Modal({
 }: ModalProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
+  // Held in a ref so a parent re-render with a fresh onClose cannot tear down
+  // the focus capture and scroll lock while the dialog is open.
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   React.useEffect(() => setMounted(true), []);
 
@@ -40,34 +46,45 @@ export function Modal({
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
 
+    const getFocusable = (): HTMLElement[] => {
+      const node = dialogRef.current;
+      if (!node) return [];
+      return Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+    };
+
     // Move focus into the dialog.
     const focusFirst = () => {
       const node = dialogRef.current;
       if (!node) return;
-      const focusable = node.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      (focusable ?? node).focus();
+      (getFocusable()[0] ?? node).focus();
     };
     focusFirst();
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && dismissible) {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
       const node = dialogRef.current;
       if (!node) return;
-      const focusable = Array.from(
-        node.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((el) => el.offsetParent !== null);
+      const focusable = getFocusable();
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      // Focus can sit outside the dialog altogether - clicking the scrim of a
+      // non-dismissible modal leaves it on <body> - so recapture it before the
+      // edge checks, otherwise Tab walks into the page behind the scrim.
+      if (!node.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
@@ -83,7 +100,7 @@ export function Modal({
       document.body.style.overflow = overflow;
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose, dismissible]);
+  }, [open, dismissible]);
 
   if (!mounted || !open) return null;
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getMyBooking } from "@/lib/db/queries";
 import { Card } from "@/components/ui/Card";
@@ -9,6 +10,13 @@ import { buttonVariants } from "@/components/ui/Button";
 import { MakePayment } from "@/components/dashboard/MakePayment";
 import { PaymentReturn } from "@/components/booking/PaymentReturn";
 import { formatDate, formatDateRange } from "@/lib/utils/dates";
+import { formatPence } from "@/lib/utils/money";
+
+export const metadata: Metadata = {
+  title: "My booking - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 const PAYMENT_LABELS: Record<string, string> = {
   deposit: "Deposit downpayment",
@@ -33,18 +41,29 @@ export default async function DashboardPage() {
     );
   }
 
-  const { booking, trip, pricing, paidToTrip, balance, damageStatus, payments } = data;
+  const { booking, trip, pricing, paidToTrip, balance, damageStatus, payments, isTerminal } = data;
   const damageLabel =
     damageStatus === "held" ? "held" : damageStatus === "refunded" ? "refunded" : damageStatus === "withheld" ? "withheld" : null;
   const cleared = balance <= 0;
   const confirmed = booking.status === "confirmed" || booking.status === "converted";
   const pct = pricing.tripCost > 0 ? (paidToTrip / pricing.tripCost) * 100 : 0;
+  // A refunded booking is over and a pending one hasn't paid its deposit, so
+  // neither may be dressed up as "Confirmed · deposit paid".
+  const statusPill: { variant: "success" | "error" | "tag"; label: string } = isTerminal
+    ? { variant: "error", label: "Refunded" }
+    : booking.status === "waitlisted"
+      ? { variant: "error", label: "On the waiting list" }
+      : booking.status === "pending"
+        ? { variant: "tag", label: "Deposit not paid yet" }
+        : booking.status === "converted"
+          ? { variant: "success", label: "Confirmed" }
+          : { variant: "success", label: "Confirmed · deposit paid" };
 
   return (
     <div className="mx-auto max-w-[1120px] px-6 py-8">
       <PaymentReturn bookingId={booking.id} />
       <h1>My booking</h1>
-      <p className="mt-1 text-soft">
+      <p className="mt-1 break-words text-soft">
         {trip.name} · {trip.organiser} · Ref {booking.reference}
       </p>
 
@@ -55,11 +74,22 @@ export default async function DashboardPage() {
           value={<Money pence={paidToTrip} />}
           sub={cleared ? "Paid in full" : `${Math.round(pct)}% paid`}
         />
-        <MetricTile label="Remaining balance" value={<Money pence={balance} />} sub={cleared ? "All cleared" : "Pay any time"} dark />
+        <MetricTile
+          label="Remaining balance"
+          value={<Money pence={balance} />}
+          sub={isTerminal ? "Booking refunded" : cleared ? "All cleared" : "Pay any time"}
+          dark
+        />
         <MetricTile
           label="Pay by"
           value={formatDate(trip.balance_due_date)}
-          sub={damageLabel ? `${formatPence(trip.damage_deposit_amount)} deposit ${damageLabel}` : undefined}
+          sub={
+            isTerminal
+              ? "Nothing left to pay"
+              : damageLabel
+                ? `${formatPence(trip.damage_deposit_amount, { stripZeros: true })} deposit ${damageLabel}`
+                : undefined
+          }
         />
       </div>
 
@@ -73,12 +103,8 @@ export default async function DashboardPage() {
                   {trip.resort} · {formatDateRange(trip.start_date, trip.end_date)} · {trip.nights} nights
                 </div>
               </div>
-              <Pill variant={booking.status === "waitlisted" ? "error" : "success"} dot>
-                {booking.status === "waitlisted"
-                  ? "On the waiting list"
-                  : booking.status === "converted"
-                    ? "Confirmed"
-                    : "Confirmed · deposit paid"}
+              <Pill variant={statusPill.variant} dot>
+                {statusPill.label}
               </Pill>
             </div>
             <div className="mt-4">
@@ -122,13 +148,36 @@ export default async function DashboardPage() {
         </div>
 
         <aside className="flex flex-col gap-4">
+          {isTerminal && (
+            <Card>
+              <h3 className="mb-1">This booking is refunded</h3>
+              <p className="text-[13px] text-soft">
+                Your deposit has gone back to the card you paid with. Nothing is owed and no tickets
+                are issued - your payment history is your receipt.
+              </p>
+            </Card>
+          )}
+          {booking.status === "pending" && (
+            <Card>
+              <h3 className="mb-1">Complete your booking</h3>
+              <p className="text-[13px] text-soft">
+                You haven&apos;t paid your deposit yet. Pay your <Money pence={trip.deposit_amount} stripZeros /> deposit to confirm your place.
+              </p>
+              <Link
+                href={`/book/${booking.id}/payment`}
+                className={buttonVariants({ variant: "dark" }) + " mt-3 inline-flex w-full"}
+              >
+                Pay your deposit →
+              </Link>
+            </Card>
+          )}
           {confirmed && !cleared && (
             <Card>
               <h3 className="mb-1">Make a payment</h3>
               <MakePayment bookingId={booking.id} balance={balance} />
             </Card>
           )}
-          {cleared && (
+          {cleared && !isTerminal && (
             <Card>
               <div className="text-[15px] font-bold">Balance cleared 🎉</div>
               <p className="mt-1 text-[13px] text-soft">
@@ -141,7 +190,9 @@ export default async function DashboardPage() {
           <Card tone="dark">
             <div className="text-[15px] font-bold text-white">🎫 Your tickets</div>
             <p className="mt-1 text-[13px] text-white/70">
-              Your lift pass and add-on tickets unlock once your balance is cleared (or 7 days before travel).
+              {isTerminal
+                ? "Tickets aren't active for a refunded booking."
+                : "Your lift pass and add-on tickets unlock once your balance is cleared (or 7 days before travel)."}
             </p>
             <Link href="/tickets" className={buttonVariants({ variant: "out" }) + " mt-3 inline-flex w-full"}>
               View my tickets →
@@ -153,6 +204,3 @@ export default async function DashboardPage() {
   );
 }
 
-function formatPence(pence: number): string {
-  return `£${(pence / 100).toFixed(0)}`;
-}

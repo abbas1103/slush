@@ -48,6 +48,44 @@ export default async function TicketsPage() {
       >
         {unlocked ? (
           <div className="font-semibold">✓ Tickets active - show these QR codes in resort.</div>
+        ) : booking.status === "pending" ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">🔒 Finish your booking to unlock tickets</div>
+              <div className="mt-1 text-[13px] text-white/70">
+                You haven&apos;t paid your deposit yet. Pay it to confirm your place, then your QR
+                tickets activate once your balance is cleared.
+              </div>
+            </div>
+            <Link href={`/book/${booking.id}/payment`} className={buttonVariants({ variant: "out" }) + " inline-flex"}>
+              Complete your booking
+            </Link>
+          </div>
+        ) : booking.status === "refunded" || booking.status === "cancelled" ? (
+          // getMyBooking deliberately surfaces refunded bookings so a student
+          // keeps a record of one. Without this branch they fell through to the
+          // balance-owing state below and were asked to pay the full trip cost
+          // for a place that no longer exists.
+          <div>
+            <div className="font-semibold">
+              {booking.status === "refunded"
+                ? "This booking has been refunded"
+                : "This booking was cancelled"}
+            </div>
+            <div className="mt-1 text-[13px] text-white/70">
+              {booking.status === "refunded"
+                ? "There are no tickets for a refunded booking. Your refund covers everything you paid for this trip."
+                : "There are no tickets for a cancelled booking. Enter your trip code again to start a new one."}
+            </div>
+          </div>
+        ) : booking.status === "waitlisted" ? (
+          <div>
+            <div className="font-semibold">🕓 You&apos;re on the waiting list</div>
+            <div className="mt-1 text-[13px] text-white/70">
+              Your deposit is paid and you&apos;re in line for a place. We&apos;ll be in touch if one
+              opens up - tickets activate once you have a confirmed place.
+            </div>
+          </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

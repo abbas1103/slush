@@ -30,16 +30,24 @@ function BalanceCheckout({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || submitting) return;
     setSubmitting(true);
     setError(null);
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: `${window.location.origin}/dashboard` },
-      redirect: "if_required",
-    });
-    if (error) {
-      setError(error.message ?? "Payment failed.");
+    try {
+      const { error: confirmError } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: `${window.location.origin}/dashboard` },
+        redirect: "if_required",
+      });
+      if (confirmError) {
+        setError(confirmError.message ?? "Payment failed.");
+        setSubmitting(false);
+        return;
+      }
+    } catch {
+      // Stripe.js itself failed (offline, blocked script) so nothing was
+      // confirmed - re-enable the button instead of freezing it (audit #81).
+      setError("We couldn't reach the payment provider. Please check your connection and try again.");
       setSubmitting(false);
       return;
     }
@@ -84,6 +92,7 @@ export function MakePayment({ bookingId, balance }: { bookingId: string; balance
   ];
 
   async function begin() {
+    if (loading) return;
     setError(null);
     const pence = Math.round(parseFloat(pounds || "0") * 100);
     if (!pence || pence < 100) {
@@ -91,14 +100,21 @@ export function MakePayment({ bookingId, balance }: { bookingId: string; balance
       return;
     }
     setLoading(true);
-    const r = await createBalancePaymentIntent(bookingId, pence);
-    setLoading(false);
-    if (!r.ok) {
-      setError(r.error);
-      return;
+    // A rejected server action (dropped connection, rotated deployment) must not
+    // strand the button on "Setting up…" with nothing to read (audit #81).
+    try {
+      const r = await createBalancePaymentIntent(bookingId, pence);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setAmount(r.amount);
+      setClientSecret(r.clientSecret);
+    } catch {
+      setError("We couldn't set up your payment - please check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-    setAmount(r.amount);
-    setClientSecret(r.clientSecret);
   }
 
   if (clientSecret) {
