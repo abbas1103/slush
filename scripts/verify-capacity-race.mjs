@@ -52,7 +52,11 @@ const env = { ...fileEnv, ...process.env };
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SECRET = env.SUPABASE_SECRET_KEY ?? "";
 const PUB = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-const PASSWORD = "Sl0pes-Race-9931x";
+// Generated per run, never committed. These users are throwaways created and
+// deleted by this script, and it refuses to run against anything but a local
+// host - but a literal password in a public repo is still a literal password,
+// and if the cleanup at the end ever fails it would be a known one.
+const PASSWORD = `Race-${randomUUID()}`;
 
 function die(message) {
   console.error(`\n❌ ${message}\n`);

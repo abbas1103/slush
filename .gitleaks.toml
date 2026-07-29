@@ -1,0 +1,42 @@
+# gitleaks configuration for SLUSH.
+#
+# The default ruleset is kept in full - this file only adds a deliberately NARROW
+# allowlist. Two string literals in lib/stripe/ match the `stripe-access-token`
+# rule because they are shaped like Stripe keys, which is the point of them: they
+# are the inert values `next build` falls back to when it evaluates route modules
+# with no runtime secrets (CI builds from three NEXT_PUBLIC placeholders - see
+# .github/workflows/ci.yml). One of the three matches is inside a comment.
+#
+# Allowlisting is by EXACT literal, not by path or rule. Excluding the files
+# would have been less typing and much worse: lib/stripe/server.ts is exactly
+# where a real key would end up if someone pasted one in, and this scan is the
+# thing that would catch it.
+#
+# If you add a placeholder, prefer a value that does not look like a credential
+# at all over extending this list.
+
+[extend]
+useDefault = true
+
+# Allowlisted by EXACT LITERAL only - never by path or by rule. Excluding
+# lib/stripe/ or scripts/ would have been less typing and much worse: those files
+# are exactly where a real key would end up if someone pasted one in, and this
+# scan is the thing that would catch it.
+[allowlist]
+description = "Reviewed non-credentials: build-phase placeholders, and a since-randomised test password"
+regexTarget = "match"
+regexes = [
+  # lib/stripe/{server,webhook-secret}.ts - the inert values `next build` falls
+  # back to when it evaluates route modules with no runtime secrets. One of the
+  # three matches is inside a comment.
+  '''sk_test_placeholder''',
+  '''whsec_placeholder''',
+  # scripts/verify-capacity-race.mjs carried this literal as the password for the
+  # throwaway users it creates. The script refuses to run against anything but a
+  # local host, so it was never a credential to a real account, and it now
+  # generates a random password per run. It remains in commit 96d5eb6, which is
+  # already pushed - restating it here changes nothing about its exposure, and
+  # rewriting ten commits of an open PR to erase a non-credential is a worse
+  # trade. Delete this line if that history is ever rewritten.
+  '''Sl0pes-Race-9931x''',
+]
