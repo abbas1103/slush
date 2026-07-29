@@ -130,6 +130,7 @@ export type Database = {
       bookings: {
         Row: {
           access_needs: string | null
+          base_price_at_booking: number | null
           created_at: string
           id: string
           insurance_choice: string | null
@@ -143,6 +144,7 @@ export type Database = {
         }
         Insert: {
           access_needs?: string | null
+          base_price_at_booking?: number | null
           created_at?: string
           id?: string
           insurance_choice?: string | null
@@ -156,6 +158,7 @@ export type Database = {
         }
         Update: {
           access_needs?: string | null
+          base_price_at_booking?: number | null
           created_at?: string
           id?: string
           insurance_choice?: string | null

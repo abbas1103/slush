@@ -15,6 +15,16 @@ const AUTH_ONLY = ['/login', '/signup']
  * request's CSP header, and Stripe/Turnstile stay host-allowlisted. In DEV we
  * keep `'unsafe-inline'` + `'unsafe-eval'` (Turbopack/React HMR need them) and
  * mint no nonce (a nonce would make browsers ignore 'unsafe-inline').
+ *
+ * INVARIANT (audit #25): a nonce can only reach HTML that is rendered per
+ * request. A statically prerendered route is built before any request exists, so
+ * its inline bootstrap scripts carry no nonce, the browser blocks them, and the
+ * page never hydrates - silently, because dev mints no nonce and so never shows
+ * it. Every route this proxy matches must therefore be excluded from
+ * prerendering (`export const dynamic = "force-dynamic"`, or read a dynamic API
+ * such as headers()); check `.next/prerender-manifest.json` after a build, which
+ * should list app routes only under /_global-error and /_not-found. Do NOT put
+ * 'unsafe-inline' back to make a page that will not hydrate work again.
  */
 function buildCsp(nonce: string | null): string {
   const isDev = process.env.NODE_ENV !== 'production'
@@ -131,9 +141,15 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on everything except Next.js internals, static assets, and the Sentry
+    // Run on everything except Next.js internals, the favicon, and the Sentry
     // tunnel route (`/monitoring`) - under Turbopack, middleware intercepting the
     // tunnel breaks client-side event recording, so it must be excluded here.
-    '/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Excluded by path only: a trailing `.*\.(svg|png|jpg|jpeg|gif|webp)$` used to
+    // be in this lookahead, which also skipped app routes that merely END in one
+    // of those extensions (/trip/foo.png, which /trip/[code] serves happily), so
+    // those responses got no CSP and no session refresh (audit #120). There is no
+    // public/ directory, so it was protecting nothing; if assets are added later,
+    // exclude their prefix instead of a suffix.
+    '/((?!_next/static|_next/image|favicon.ico|monitoring).*)',
   ],
 }
