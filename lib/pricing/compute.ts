@@ -3,7 +3,11 @@
  * Mirrors the DB's compute_trip_cost / record_payment_and_finalize so the
  * sidebar total, the payment intent, and the ledger all agree.
  *
- * Trip cost C   = base_price + Σ(extra line items)
+ * Trip cost C   = base price + Σ(extra line items)
+ *                 (callers pass bookings.base_price_at_booking when the booking
+ *                  has one, else trips.base_price - the same coalesce the DB's
+ *                  compute_trip_cost does, so an admin price edit can't reprice
+ *                  a booking that is already taken)
  * Deposit today = deposit_amount (£150) = downpayment (£50, → trip) + damage (£100, held)
  * Balance after deposit = C − downpayment
  * Pay in full today     = C + damage_deposit
