@@ -39,6 +39,38 @@ export function isAdmin(user: User | null): boolean {
   return user?.app_metadata?.role === "admin";
 }
 
+/** Staff = admin or rep. Same JWT claim, admin being the superset. */
+export function isStaff(user: User | null): boolean {
+  const role = user?.app_metadata?.role;
+  return role === "admin" || role === "rep";
+}
+
+/**
+ * Require staff (admin or rep). The gate for the ticket scanner.
+ *
+ * NO SECOND FACTOR, deliberately, and the reasoning matters. requireAdminMfa()
+ * redirects an un-enrolled user to /admin/mfa or /admin/security - both under
+ * /admin, which proxy.ts restricts to `role === 'admin'`. A rep sent there would
+ * be bounced home, leaving them no route to enrol and no way to scan. Demanding
+ * aal2 here would make the scanner unusable by exactly the people it is for.
+ *
+ * The exposure that buys is small: the scan view shows a name, a reference and an
+ * entitlement, it needs a token the rep is physically holding, and every scan is
+ * logged with who did it. A rep already carries the paper manifest, which has the
+ * same names on it.
+ *
+ * If rep MFA is ever wanted, the enrolment screens have to be opened to staff
+ * first - otherwise this becomes a lockout, not a hardening.
+ */
+export async function requireStaff(nextPath?: string): Promise<User> {
+  const user = await getUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(nextPath ?? "/")}`);
+  // Same as the admin gate: send non-staff to their dashboard rather than
+  // disclosing that the route means anything.
+  if (!isStaff(user)) redirect("/dashboard");
+  return user;
+}
+
 /**
  * Require an admin. Redirects non-admins to /dashboard so /admin's existence
  * isn't disclosed. This is the ROLE gate only - the second-factor gate is

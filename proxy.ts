@@ -5,6 +5,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED = ['/dashboard', '/book', '/trip', '/account', '/tickets']
 // Admin area: requires a logged-in ADMIN (role in JWT app_metadata)
 const ADMIN = ['/admin']
+// Staff area: admin OR rep. The ticket scanner - deliberately NOT under /admin,
+// because that path is admin-only and reps must never need the admin role (an
+// admin can read every student's passport and medical needs). The page re-checks
+// with requireStaff(); this is the outer gate only.
+const STAFF = ['/scan']
 // Routes that logged-in users should be bounced away from
 const AUTH_ONLY = ['/login', '/signup']
 
@@ -119,6 +124,22 @@ export default async function proxy(request: NextRequest) {
       return finalize(NextResponse.redirect(loginUrl))
     }
     if (role !== 'admin') {
+      return finalize(NextResponse.redirect(new URL('/', request.url)))
+    }
+    return finalize(response)
+  }
+
+  // Staff area (the scanner): admin or rep. A signed-in student who scans someone
+  // else's QR is sent home rather than shown that the route means anything. The
+  // `next` target keeps the full path, INCLUDING the token, so a rep whose session
+  // lapsed lands back on the right ticket after signing in.
+  if (STAFF.some((r) => pathname.startsWith(r))) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return finalize(NextResponse.redirect(loginUrl))
+    }
+    if (role !== 'admin' && role !== 'rep') {
       return finalize(NextResponse.redirect(new URL('/', request.url)))
     }
     return finalize(response)

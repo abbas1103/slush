@@ -574,6 +574,85 @@ export type Database = {
           },
         ]
       }
+      ticket_tokens: {
+        Row: {
+          booking_id: string
+          issued_at: string
+          max_scans: number
+          revoked_at: string | null
+          ticket_id: string
+          ticket_type: string
+          title: string
+          token: string
+        }
+        Insert: {
+          booking_id: string
+          issued_at?: string
+          max_scans?: number
+          revoked_at?: string | null
+          ticket_id: string
+          ticket_type: string
+          title: string
+          token: string
+        }
+        Update: {
+          booking_id?: string
+          issued_at?: string
+          max_scans?: number
+          revoked_at?: string | null
+          ticket_id?: string
+          ticket_type?: string
+          title?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_tokens_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_scans: {
+        Row: {
+          booking_id: string
+          id: string
+          metadata: Json | null
+          result: string
+          scanned_at: string
+          scanned_by: string | null
+          token: string
+        }
+        Insert: {
+          booking_id: string
+          id?: string
+          metadata?: Json | null
+          result: string
+          scanned_at?: string
+          scanned_by?: string | null
+          token: string
+        }
+        Update: {
+          booking_id?: string
+          id?: string
+          metadata?: Json | null
+          result?: string
+          scanned_at?: string
+          scanned_by?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_scans_token_fkey"
+            columns: ["token"]
+            isOneToOne: false
+            referencedRelation: "ticket_tokens"
+            referencedColumns: ["token"]
+          },
+        ]
+      }
       payment_reconciliation_queue: {
         Row: {
           amount: number

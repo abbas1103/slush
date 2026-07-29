@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getMyBooking } from "@/lib/db/queries";
-import { deriveTickets, signTicketToken, ticketQrDataUrl } from "@/lib/tickets";
+import { deriveTickets, ticketQrDataUrl, ticketScanUrl } from "@/lib/tickets";
+import { issueTicketTokens } from "@/lib/db/tickets";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
@@ -29,12 +30,17 @@ export default async function TicketsPage() {
   const withinSeven = start - Date.now() <= SEVEN_DAYS_MS;
   const unlocked = confirmed && (balance <= 0 || withinSeven);
 
-  const tickets = deriveTickets(booking.reference, selectedExtras);
-  const exp = Math.floor(new Date(`${trip.end_date}T23:59:59`).getTime() / 1000);
+  // Tokens are issued (idempotently) only once the tickets are unlocked - there is
+  // no reason for a live QR to exist for a booking that cannot travel yet. The QR
+  // encodes a /scan/<token> URL so a rep can use their phone's ordinary camera.
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const issued = unlocked
+    ? await issueTicketTokens(booking.id, booking.reference, selectedExtras)
+    : deriveTickets(booking.reference, selectedExtras).map((t) => ({ ...t, token: null }));
   const rendered = await Promise.all(
-    tickets.map(async (t) => ({
+    issued.map(async (t) => ({
       ...t,
-      qr: unlocked ? await ticketQrDataUrl(signTicketToken(booking.id, t.ticketId, exp)) : null,
+      qr: t.token ? await ticketQrDataUrl(ticketScanUrl(t.token, site)) : null,
     })),
   );
 
@@ -105,10 +111,10 @@ export default async function TicketsPage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {rendered.map((t) => (
           <Card key={t.key} className="flex gap-4">
-            <div className="grid size-[120px] shrink-0 place-items-center rounded-btn border border-line bg-soft-panel">
+            <div className="grid size-[168px] shrink-0 place-items-center rounded-btn border border-line bg-soft-panel">
               {t.qr ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={t.qr} alt={`${t.title} QR code`} className="size-[108px]" />
+                <img src={t.qr} alt={`${t.title} QR code`} className="size-[152px]" />
               ) : (
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-soft">Locked</span>
               )}
