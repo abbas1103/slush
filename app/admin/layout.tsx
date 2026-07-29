@@ -19,6 +19,9 @@ export default async function AdminLayout({
             SLUSH <span className="text-[13px] font-medium text-soft">admin</span>
           </Link>
           <div className="flex items-center gap-5 text-[13px] text-soft">
+            <Link href="/admin/staff" className="hover:text-ink">
+              Staff
+            </Link>
             <Link href="/admin/security" className="hover:text-ink">
               Security
             </Link>

@@ -838,6 +838,11 @@ export type Database = {
       redeem_trip_code: { Args: { p_code: string }; Returns: string }
       // 'released' | 'payment_in_flight' | 'not_found' - refuses to cancel a
       // booking whose PaymentIntent can still settle.
+      // service_role only. Ends every session for a user immediately (clearing
+      // app_metadata.role leaves an issued token valid until it expires).
+      revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      is_staff: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_staff_mfa: { Args: Record<PropertyKey, never>; Returns: boolean }
       release_hold: { Args: { p_booking_id: string }; Returns: string }
       start_booking: {
         Args: { p_code: string }
