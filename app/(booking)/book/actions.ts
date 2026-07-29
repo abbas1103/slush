@@ -10,6 +10,7 @@ import { encryptPII } from "@/lib/crypto/pii";
 import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
 import { stripe } from "@/lib/stripe/server";
 import { rateLimit } from "@/lib/ratelimit";
+import { TERMS_VERSION } from "@/lib/legal/version";
 
 type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
@@ -172,7 +173,12 @@ async function clearLiveIntent(
 
 // ── Start a booking (create hold + pending booking) ──────────────────────────
 export type StartResult =
-  | { ok: true; bookingId: string; isWaitlist: boolean; expiresAt: string }
+  // A fresh or resumed hold: the student has 30 minutes, so expiresAt is real.
+  | { ok: true; placed: false; bookingId: string; isWaitlist: boolean; expiresAt: string }
+  // Already confirmed/waitlisted/converted. start_booking returns before minting
+  // a hold, so there is NO expiry - the caller must route to the booking rather
+  // than the checkout, and must not start a countdown.
+  | { ok: true; placed: true; bookingId: string; status: string }
   | { ok: false; error: string };
 
 export async function startBooking(code: string): Promise<StartResult> {
@@ -198,8 +204,15 @@ export async function startBooking(code: string): Promise<StartResult> {
   }
   const row = data?.[0];
   if (!row) return { ok: false, error: "Could not start your booking." };
+  // An already-placed student gets their status and a null expiry. Passing that
+  // null on as a date rendered a countdown from the epoch, i.e. an instantly
+  // "expired" hold on a booking that is actually confirmed.
+  if (row.status !== "pending" || row.expires_at === null) {
+    return { ok: true, placed: true, bookingId: row.booking_id, status: row.status };
+  }
   return {
     ok: true,
+    placed: false,
     bookingId: row.booking_id,
     isWaitlist: row.is_waitlist,
     expiresAt: row.expires_at,
@@ -238,10 +251,19 @@ export async function releaseHold(bookingId: string): Promise<ReleaseResult> {
   if (!lock.ok) return { ok: false, error: lock.error };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("release_hold", { p_booking_id: bookingId });
+  const { data: outcome, error } = await supabase.rpc("release_hold", { p_booking_id: bookingId });
   if (error) {
     reportFailure("releaseHold", error);
     return { ok: false, error: "Couldn't release your place - please refresh and try again." };
+  }
+  // release_hold returns a code rather than void. Reporting success on
+  // 'payment_in_flight' told the student their place was released while the
+  // booking stayed pending with a confirmable intent against it.
+  if (outcome === "payment_in_flight") {
+    return {
+      ok: false,
+      error: "A payment for this booking is still going through - please refresh in a moment.",
+    };
   }
   return { ok: true };
 }
@@ -624,7 +646,9 @@ export async function saveDetails(
   const { error: consentInsErr } = await admin.from("consents").insert({
     user_id: auth.user.id,
     booking_id: bookingId,
-    terms_version: "v1",
+    // The identifier the /terms page actually displays, not a hardcoded literal:
+    // a consent row must name wording that exists.
+    terms_version: TERMS_VERSION,
     terms_accepted_at: nowIso,
     marketing_opt_in: d.marketingOptIn,
     marketing_opt_in_at: d.marketingOptIn ? nowIso : null,

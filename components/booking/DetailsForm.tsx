@@ -405,7 +405,10 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
                 Booking Conditions
               </Link>
               , the{" "}
-              <Link href="/terms#refunds" target="_blank" rel="noopener" className="underline">
+              {/* #cancellations is the id the terms page defines; #refunds
+                  resolved nowhere, so this landed the student at the top of the
+                  document at the exact moment they consent. */}
+              <Link href="/terms#cancellations" target="_blank" rel="noopener" className="underline">
                 Refund Policy
               </Link>{" "}
               and the{" "}

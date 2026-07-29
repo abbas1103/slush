@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Section, P, Ul, Ph, DraftNotice } from "@/components/legal/prose";
+import { TERMS_VERSION } from "@/lib/legal/version";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions - SLUSH",
@@ -9,14 +10,6 @@ export const metadata: Metadata = {
 // Per-request render so the CSP nonce reaches this page's scripts; see the
 // INVARIANT note in proxy.ts (audit #25).
 export const dynamic = "force-dynamic";
-
-/**
- * Version identifier for this document, shown at the top of the page. saveDetails
- * must record this exact string in consents.terms_version, so a consent row names
- * the wording the student actually accepted - keep the two in step, and bump this
- * and the date below together whenever the wording changes.
- */
-const TERMS_VERSION = "terms-2026-07-29-draft";
 
 export default function TermsPage() {
   return (

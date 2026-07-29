@@ -36,7 +36,21 @@ export function BookingActions({
   const run = (fn: () => Promise<Res>) =>
     start(async () => {
       setErr(null);
-      const r = await fn();
+      let r: Res;
+      try {
+        r = await fn();
+      } catch {
+        // A server action can REJECT (network drop, a redirect, an unhandled
+        // throw) rather than resolve {ok:false}. Without this the confirm panel
+        // stayed open with no message on an action that may well have moved
+        // money, and a second click would have refunded again.
+        setConfirming(null);
+        setErr(
+          "We couldn't tell whether that went through. Check the booking in Stripe before retrying.",
+        );
+        router.refresh();
+        return;
+      }
       // Close the confirm either way: a refund that failed must be re-opened and
       // re-confirmed deliberately, never retried by a second click on a live panel.
       setConfirming(null);

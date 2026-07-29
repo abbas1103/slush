@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import type Stripe from "stripe";
-import { stripe } from "@/lib/stripe/server";
+import { stripe, stripeWebhookSecret } from "@/lib/stripe/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Stripe SDK + raw-body verification require the Node runtime.
@@ -111,16 +111,15 @@ async function recordMoneyEvent(
 export async function POST(request: Request) {
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!sig || !secret) {
-    // A missing secret is a deploy fault that silently 400s EVERY event, so it
-    // has to reach the on-call view. A missing header is just a stray caller.
-    if (!secret) {
-      const summary = "STRIPE_WEBHOOK_SECRET is not set - every Stripe webhook is being rejected.";
-      console.error(`[stripe-webhook] ${summary}`);
-      Sentry.captureMessage(summary, { level: "error", tags: { area: "stripe-webhook" } });
-    }
-    return new NextResponse("Missing signature or secret", { status: 400 });
+  // Resolved and validated at module load in lib/stripe/server.ts, which this
+  // route already imports for `stripe` - so an unset secret throws there and
+  // never reaches this handler. Re-reading process.env here duplicated that
+  // check into a branch that could not run, and 400ing on a deploy fault would
+  // have made Stripe give up rather than retry.
+  const secret = stripeWebhookSecret;
+  if (!sig) {
+    // Just a stray caller with no Stripe signature: not a deploy fault.
+    return new NextResponse("Missing signature", { status: 400 });
   }
 
   let event: Stripe.Event;

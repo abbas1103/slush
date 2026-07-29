@@ -249,3 +249,42 @@ export async function getAdminTripBookings(
     pageCount: page === null ? 1 : Math.max(1, Math.ceil(totalRows / pageSize)),
   };
 }
+
+export interface ReconciliationRow {
+  id: string;
+  bookingId: string;
+  reference: string | null;
+  intentId: string;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+/**
+ * Open rows in payment_reconciliation_queue: money Stripe captured that
+ * finalize could not place, so a human has to refund it or fix the booking.
+ *
+ * finalize writes here instead of raising, which stops the webhook wedging in a
+ * three-day Stripe retry loop - but a queue nobody reads is the same silence in
+ * a different table. The admin home surfaces the count so it cannot sit unseen.
+ */
+export async function getOpenReconciliations(): Promise<ReconciliationRow[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("payment_reconciliation_queue")
+    .select("id, booking_id, stripe_payment_intent_id, amount, reason, created_at, bookings(reference)")
+    .is("resolved_at", null)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) throw new Error(`Could not load the reconciliation queue: ${error.message}`);
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    bookingId: r.booking_id,
+    reference: (r.bookings as { reference: string } | null)?.reference ?? null,
+    intentId: r.stripe_payment_intent_id,
+    amount: r.amount,
+    reason: r.reason,
+    createdAt: r.created_at,
+  }));
+}

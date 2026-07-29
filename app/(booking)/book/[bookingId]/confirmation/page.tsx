@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computePricing } from "@/lib/pricing/compute";
+import { computePaidToTrip } from "@/lib/db/queries";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
@@ -55,14 +56,21 @@ export default async function ConfirmationPage({
     damageDepositAmount: trip.damage_deposit_amount,
     extras: (bes ?? []).map((b) => ({ label: "", amount: b.price_at_booking * b.quantity })),
   });
-  const paidToTrip = (payments ?? [])
-    .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
-    .reduce((sum, p) => sum + p.amount, 0);
+  // One implementation of this, shared with the dashboard and the admin table.
+  // The local copy this replaces omitted the waitlist-refund term, so a refunded
+  // waitlister was still shown as having paid their downpayment.
+  const paidToTrip = computePaidToTrip(payments ?? [], trip.downpayment_amount);
   const balance = pricing.tripCost - paidToTrip;
   const damageHeld = (payments ?? []).some((p) => p.type === "damage_deposit_hold" && p.status === "succeeded");
 
   const isPending = booking.status === "pending";
   const isWaitlist = booking.status === "waitlisted";
+  // Terminal states must never fall through to the success branch. A booking the
+  // hold sweep cancelled, or one that has been refunded, was still being told
+  // "Your place is booked!" because the branch below was a bare else.
+  const isCancelled = booking.status === "cancelled";
+  const isRefunded = booking.status === "refunded";
+  const isTerminal = isCancelled || isRefunded;
 
   return (
     <div className="mx-auto max-w-[1120px] px-6 py-10">
@@ -83,6 +91,22 @@ export default async function ConfirmationPage({
               </Link>
             </p>
           </>
+        ) : isTerminal ? (
+          <>
+            <h1 className="text-white">
+              {isRefunded ? "This booking has been refunded" : "This booking was cancelled"}
+            </h1>
+            <p className="mt-2 text-white/70">
+              {isRefunded
+                ? `We've refunded your payment for the ${trip.name}. Refunds usually reach your card within a few working days.`
+                : `Your hold on the ${trip.name} expired before payment, so the place was released. You can start again with your trip code.`}
+            </p>
+            <p className="mt-4">
+              <Link href="/dashboard" className="text-[13px] text-white/80 underline">
+                Go to my dashboard →
+              </Link>
+            </p>
+          </>
         ) : isWaitlist ? (
           <>
             <h1 className="text-white">You&apos;re on the waiting list ⏳</h1>
@@ -97,7 +121,7 @@ export default async function ConfirmationPage({
             <p className="mt-2 text-white/70">You&apos;re going on the {trip.name}.</p>
           </>
         )}
-        {!isPending && (
+        {!isPending && !isTerminal && (
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {[
               ["Booking reference", booking.reference],
@@ -113,7 +137,7 @@ export default async function ConfirmationPage({
         )}
       </div>
 
-      {!isPending && (
+      {!isPending && !isTerminal && (
         <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
           <Card padding="lg">
             <div className="flex items-center justify-between">

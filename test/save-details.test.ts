@@ -4,6 +4,7 @@ import { saveDetails } from "@/app/(booking)/book/actions";
 import { decryptPII } from "@/lib/crypto/pii";
 import type { DetailsInput } from "@/lib/validation/details";
 import { createFakeClient, type FakeCall, type FakeClient, type FakeClientOptions, type FakeRow } from "./fake-supabase";
+import { TERMS_VERSION } from "@/lib/legal/version";
 
 /**
  * saveDetails is the 18+ gate and the only writer of student PII, so this covers
@@ -248,7 +249,11 @@ describe("saveDetails: the record of what was agreed", () => {
     const consent = payloadFor(db, "consents", "insert");
     expect(consent.booking_id).toBe(BOOKING_ID);
     expect(consent.user_id).toBe(USER_ID);
-    expect(consent.terms_version).toBe("v1");
+    // Must be the identifier the /terms page displays, not a literal. These
+    // drifted before: the page said terms-2026-07-29-draft while consent rows
+    // recorded "v1", naming a version that had never existed.
+    expect(consent.terms_version).toBe(TERMS_VERSION);
+    expect(consent.terms_version).not.toBe("v1");
     expect(typeof consent.terms_accepted_at).toBe("string");
     expect(consent.marketing_opt_in).toBe(true);
     expect(typeof consent.marketing_opt_in_at).toBe("string");

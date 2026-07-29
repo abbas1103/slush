@@ -20,8 +20,8 @@ export default async function AccountPage() {
             overflows the card and gives the whole page horizontal scroll. */}
         <div className="break-all text-[15px] font-semibold">{user.email}</div>
         <p className="mt-3 text-[13px] text-soft">
-          Full account management (editing your saved details, downloading your data) arrives in a
-          later slice. Your booking details are entered during checkout.
+          You enter your booking details during checkout. To change them, or to ask for a copy of
+          your data or its deletion, email us and we&apos;ll take care of it.
         </p>
         <form action="/auth/signout" method="post" className="mt-4">
           <button type="submit" className={buttonVariants({ variant: "out" })}>

@@ -63,11 +63,17 @@ export default async function TripDetailPage({
     ],
     [
       "Cancellation",
-      <Link key="cancellation" href="/terms#booking" className="underline hover:no-underline">
-        Booking conditions
+      // #cancellations, not #booking: the latter is "Booking & payment", so the
+      // Cancellation row was linking a student to the wrong section.
+      <Link key="cancellation" href="/terms#cancellations" className="underline hover:no-underline">
+        Cancellations &amp; refunds
       </Link>,
     ],
     ["Trip run by", `${trip.organiser}, via SLUSH`],
+    // saveDetails hard-rejects anyone under 18 on the arrival date, so a student
+    // can otherwise reach the details step, fill in a passport number and only
+    // then be refused. This is the one place they see it before committing.
+    ["Age", "18+ on arrival in resort"],
   ];
 
   return (

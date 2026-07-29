@@ -104,7 +104,7 @@ export async function processCrmOutbox(
 
       const { data: trip, error: tripError } = await admin
         .from("trips")
-        .select("name, base_price, start_date, end_date")
+        .select("name, base_price, downpayment_amount, start_date, end_date")
         .eq("id", b.trip_id)
         .single();
       if (tripError) throw new Error(`trip read failed: ${tripError.message}`);
@@ -116,9 +116,17 @@ export async function processCrmOutbox(
       const tripCost =
         (b.base_price_at_booking ?? trip?.base_price ?? 0) +
         bes.reduce((s, e) => s + e.price_at_booking * e.quantity, 0);
-      const paidToTrip = pays
+      // Must match booking_trip_paid and computePaidToTrip: 000300 enqueues a
+      // CRM sync on waitlist_refund, and without the refund term that sync
+      // pushed the pre-refund balance, so the CRM's figure was wrong precisely
+      // when the trigger fired.
+      const received = pays
         .filter((p) => p.status === "succeeded" && (p.type === "deposit" || p.type === "balance"))
         .reduce((s, p) => s + p.amount, 0);
+      const returned = pays
+        .filter((p) => p.status === "succeeded" && p.type === "waitlist_refund")
+        .reduce((s, p) => s + Math.min(p.amount, trip?.downpayment_amount ?? 0), 0);
+      const paidToTrip = received - returned;
 
       await adapter.upsertContact({
         externalId: b.user_id,

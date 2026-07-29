@@ -61,6 +61,23 @@ export default async function TicketsPage() {
               Complete your booking
             </Link>
           </div>
+        ) : booking.status === "refunded" || booking.status === "cancelled" ? (
+          // getMyBooking deliberately surfaces refunded bookings so a student
+          // keeps a record of one. Without this branch they fell through to the
+          // balance-owing state below and were asked to pay the full trip cost
+          // for a place that no longer exists.
+          <div>
+            <div className="font-semibold">
+              {booking.status === "refunded"
+                ? "This booking has been refunded"
+                : "This booking was cancelled"}
+            </div>
+            <div className="mt-1 text-[13px] text-white/70">
+              {booking.status === "refunded"
+                ? "There are no tickets for a refunded booking. Your refund covers everything you paid for this trip."
+                : "There are no tickets for a cancelled booking. Enter your trip code again to start a new one."}
+            </div>
+          </div>
         ) : booking.status === "waitlisted" ? (
           <div>
             <div className="font-semibold">🕓 You&apos;re on the waiting list</div>

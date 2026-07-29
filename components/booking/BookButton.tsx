@@ -27,6 +27,15 @@ export function BookButton({ code, isFull }: { code: string; isFull: boolean }) 
         setError(r.error);
         return;
       }
+      // Already confirmed, waitlisted or converted: there is no hold and no
+      // expiry, so opening the countdown modal would show an expired timer for a
+      // booking that is actually secured. Send them to the booking instead.
+      if (r.placed) {
+        router.push(
+          r.status === "pending" ? `/book/${r.bookingId}/extras` : `/book/${r.bookingId}/confirmation`,
+        );
+        return;
+      }
       setHold({ bookingId: r.bookingId, isWaitlist: r.isWaitlist, expiresAt: r.expiresAt });
     });
   }

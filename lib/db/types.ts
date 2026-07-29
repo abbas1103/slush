@@ -574,6 +574,50 @@ export type Database = {
           },
         ]
       }
+      payment_reconciliation_queue: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          reason: string
+          resolved_at: string | null
+          stripe_charge_id: string | null
+          stripe_payment_intent_id: string
+        }
+        Insert: {
+          amount: number
+          booking_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          reason: string
+          resolved_at?: string | null
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string
+          resolved_at?: string | null
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reconciliation_queue_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_events: {
         Row: {
           id: string
@@ -792,13 +836,20 @@ export type Database = {
         Returns: Database["public"]["Enums"]["booking_status"]
       }
       redeem_trip_code: { Args: { p_code: string }; Returns: string }
-      release_hold: { Args: { p_booking_id: string }; Returns: undefined }
+      // 'released' | 'payment_in_flight' | 'not_found' - refuses to cancel a
+      // booking whose PaymentIntent can still settle.
+      release_hold: { Args: { p_booking_id: string }; Returns: string }
       start_booking: {
         Args: { p_code: string }
         Returns: {
           booking_id: string
-          expires_at: string
+          // The booking's status, so the caller can route an already-placed
+          // student to their booking instead of the pay screen.
+          status: Database["public"]["Enums"]["booking_status"]
           is_waitlist: boolean
+          // NULL when the booking is already placed: that branch returns before
+          // a hold is minted, so there is no expiry to report.
+          expires_at: string | null
         }[]
       }
       trip_effective_full: { Args: { p_trip_id: string }; Returns: boolean }
