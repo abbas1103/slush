@@ -25,7 +25,8 @@ themselves live only in `.env.local` (local, gitignored) and Vercel's env settin
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase | no | yes | Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase | no | yes | `sb_publishable_…` |
 | `SUPABASE_SECRET_KEY` | Supabase | **yes** | yes | `sb_secret_…`, bypasses RLS |
-| `PII_ENCRYPTION_KEY` | (generated) | **yes** | yes | Never rotate once data exists |
+| `PII_ENCRYPTION_KEY` | (generated) | **yes** | yes | Rotate only via the procedure below |
+| `PII_ENCRYPTION_KEY_RETIRED` | (generated) | **yes** | no | Previous keys, comma-separated - reads only |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe | no | yes | `pk_test_…` |
 | `STRIPE_SECRET_KEY` | Stripe | **yes** | yes | `sk_test_…` |
 | `STRIPE_WEBHOOK_SECRET` | Stripe | **yes** | for payments | `whsec_…` |
@@ -81,8 +82,29 @@ openssl rand -base64 32
 ```
 
 > **Critical:** this key is not "obtained" from a service, it is generated once and kept. If it is
-> lost or changed after data has been written, every encrypted field becomes **permanently
-> unreadable**. On handover it must travel with the database. Do not rotate it casually.
+> lost after data has been written, every encrypted field becomes **permanently unreadable**. On
+> handover it must travel with the database.
+
+### Rotating it - `PII_ENCRYPTION_KEY_RETIRED`
+
+Rotation is supported, but only through this procedure. Writes always use `PII_ENCRYPTION_KEY`;
+reads try it first and then each key in `PII_ENCRYPTION_KEY_RETIRED` (comma-separated base64), so
+rows written under an older key stay readable while the new one rolls out.
+
+1. Generate the new key: `openssl rand -base64 32`.
+2. Move the **current** value into `PII_ENCRYPTION_KEY_RETIRED` (append with a comma if it already
+   has entries), and put the new key in `PII_ENCRYPTION_KEY`. Set both in the same Vercel save so no
+   deployment ever runs with the new key and no retired one.
+3. Deploy. Existing rows read via the retired key; anything written from now on uses the new key.
+4. Re-encrypt: every student who saves their details is migrated automatically, but rows nobody
+   touches stay on the old key. Until they are re-encrypted, the retired key must remain set.
+5. Only remove the retired key once you have confirmed no row still needs it.
+
+> Setting `PII_ENCRYPTION_KEY` to a new value **without** carrying the old one into
+> `PII_ENCRYPTION_KEY_RETIRED` makes every existing passport number, DOB, phone and access-needs
+> field unreadable. `decryptPII` returns null for a value it cannot open and raises a Sentry error
+> ("could not open a well-formed v1 value under any key") - if you see that after a key change, stop
+> and restore the old key before anyone saves a form, because a save overwrites the ciphertext.
 
 ## 4. Stripe - publishable, secret, webhook
 

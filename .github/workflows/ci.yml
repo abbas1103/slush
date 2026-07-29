@@ -39,6 +39,16 @@ jobs:
           # fixed next ships; do not add one without saying why here.
           # (Dev-only tooling is excluded via --omit=dev: the eslint chain's
           # advisories need an eslint 10 major bump and never ship to students.)
+          # Assert the report's SHAPE before gating on it. Both npm audit calls are
+          # `|| true` (a non-zero exit just means advisories exist), and every jq
+          # path below uses optional operators - so a registry failure, a proxy
+          # error page, or an empty file all produce an empty result and the gate
+          # would print "No unreviewed advisories" and pass. jq on empty input
+          # also exits 0, so the file has to be checked explicitly.
+          if [ ! -s audit.json ] || ! jq -e 'has("vulnerabilities")' audit.json > /dev/null; then
+            echo "::error::npm audit produced no vulnerabilities object - treating as a failed audit, not a clean one"
+            exit 1
+          fi
           known='["1117015","1124252","1124288","1124066"]'
           new=$(jq -r --argjson known "$known" '[.vulnerabilities[]?.via[]? | select(type == "object") | .source | tostring] - $known | unique | join(" ")' audit.json)
           if [ -n "$new" ]; then

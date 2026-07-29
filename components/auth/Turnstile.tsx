@@ -53,6 +53,11 @@ function loadTurnstile(): Promise<void> {
       resolve();
       return;
     }
+    // Reusing an element that has ALREADY errored is a dead end: load/error have
+    // both fired, so listeners attached now never fire and the promise never
+    // settles - which then gets cached as scriptPromise for the rest of the
+    // session. The catch below removes the failed element, so reaching here with
+    // one still present means the load is genuinely in flight.
     const existing = document.getElementById(SCRIPT_ID);
     const script =
       existing instanceof HTMLScriptElement ? existing : document.createElement("script");
@@ -67,8 +72,13 @@ function loadTurnstile(): Promise<void> {
     }
   });
 
-  // A failed load must not poison later mounts.
+  // A failed load must not poison later mounts. Clearing scriptPromise alone was
+  // not enough: the next mount found the errored <script> still in the head, took
+  // the reuse branch, and attached listeners to an element whose load/error had
+  // already fired - a promise that can never settle, cached for the session. Bin
+  // the element so the retry genuinely appends a fresh one.
   promise.catch(() => {
+    document.getElementById(SCRIPT_ID)?.remove();
     if (scriptPromise === promise) scriptPromise = null;
   });
   scriptPromise = promise;

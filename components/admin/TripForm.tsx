@@ -46,6 +46,7 @@ export function TripForm({ tripId, initial }: { tripId: string | null; initial: 
   });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [oversoldAck, setOversoldAck] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
 
@@ -102,11 +103,16 @@ export function TripForm({ tripId, initial }: { tripId: string | null; initial: 
       status: f.status as TripInput["status"],
     };
     try {
-      const r = await saveTrip(tripId, input);
+      // An oversold capacity is recordable but never silent: the first save
+      // reports it and arms this flag, and only a second, deliberate save
+      // commits it (server-side too - the flag is just the acknowledgement).
+      const r = await saveTrip(tripId, input, { acknowledgeOversold: oversoldAck });
       if (!r.ok) {
         setError(r.error);
+        setOversoldAck(!!r.needsOversoldAck);
         return;
       }
+      setOversoldAck(false);
       if (!tripId) router.push(`/admin/trips/${r.id}`);
       else {
         setSaved(true);
@@ -159,7 +165,15 @@ export function TripForm({ tripId, initial }: { tripId: string | null; initial: 
       {error && <p className="text-[13px] text-err">{error}</p>}
       {saved && <p className="text-[13px] text-ok">Saved.</p>}
       <div>
-        <Button type="submit" disabled={saving}>{saving ? "Saving…" : tripId ? "Save changes" : "Create trip"}</Button>
+        <Button type="submit" disabled={saving}>
+          {saving
+            ? "Saving…"
+            : oversoldAck
+              ? "Save anyway"
+              : tripId
+                ? "Save changes"
+                : "Create trip"}
+        </Button>
       </div>
     </form>
   );

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import type Stripe from "stripe";
-import { stripe, stripeWebhookSecret } from "@/lib/stripe/server";
+import { stripe } from "@/lib/stripe/server";
+import { stripeWebhookSecret } from "@/lib/stripe/webhook-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Stripe SDK + raw-body verification require the Node runtime.
@@ -111,11 +112,11 @@ async function recordMoneyEvent(
 export async function POST(request: Request) {
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
-  // Resolved and validated at module load in lib/stripe/server.ts, which this
-  // route already imports for `stripe` - so an unset secret throws there and
-  // never reaches this handler. Re-reading process.env here duplicated that
-  // check into a branch that could not run, and 400ing on a deploy fault would
-  // have made Stripe give up rather than retry.
+  // Resolved and validated at module load in lib/stripe/webhook-secret.ts, which
+  // ONLY this route imports - so an unset signing secret fails the webhook (5xx,
+  // which Stripe retries) without touching the booking flow or the CMS. Reading
+  // process.env here would duplicate that check into a branch that cannot run,
+  // and 400ing on a deploy fault makes Stripe give up rather than retry.
   const secret = stripeWebhookSecret;
   if (!sig) {
     // Just a stray caller with no Stripe signature: not a deploy fault.

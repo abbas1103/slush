@@ -1,4 +1,5 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 /**
@@ -85,5 +86,17 @@ export function decryptPII(value: string | null | undefined): string | null {
       // Wrong key or tampered/corrupt value - try the next key, then give up.
     }
   }
+  // A WELL-FORMED v1 value that no key can open is not "no data": it is a
+  // recoverable ciphertext we have temporarily lost the key for - a wrong or
+  // rotated PII_ENCRYPTION_KEY, or a missing PII_ENCRYPTION_KEY_RETIRED. Left
+  // silent, the student sees an empty field and their next save overwrites the
+  // ciphertext with NULL, destroying it for good. Callers still get null (the
+  // documented contract, and a throw here would break every read path), but the
+  // deploy fault is now loud. Nothing about the value itself is reported.
+  Sentry.captureMessage("decryptPII could not open a well-formed v1 value under any key", {
+    level: "error",
+    tags: { area: "pii-crypto" },
+    extra: { retiredKeysConfigured: decryptionKeys().length - 1 },
+  });
   return null;
 }

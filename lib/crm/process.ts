@@ -5,14 +5,21 @@ import { getCrmAdapter } from "./adapters";
 
 /** Attempts after which the drain gives up on a row (matches the select filter). */
 const MAX_ATTEMPTS = 5;
-/** Rows fetched per run. Well above a sold-out trip so one run clears a launch. */
-const DEFAULT_LIMIT = 500;
 /**
- * Wall-clock budget for one run. The cron route declares no `maxDuration`, so it
- * gets Vercel's default (10s); stop short of that and leave the rest queued for
- * the next run instead of being killed mid-loop.
+ * Rows fetched per run. Each row costs several round trips (booking read, trip
+ * read, then the CRM call), so the OLD comment claiming 500 "clears a launch" was
+ * false: the budget below stopped the loop long before the limit was reached, and
+ * the real throughput was a handful of events per run. Sized to what the budget
+ * can actually get through, so `queued` in the result is an honest backlog rather
+ * than an artefact of a limit nobody reaches.
  */
-const DEFAULT_BUDGET_MS = 8_000;
+const DEFAULT_LIMIT = 200;
+/**
+ * Wall-clock budget for one run, set against the route's declared
+ * `maxDuration = 60`. Stop short of it and leave the remainder queued rather than
+ * be killed mid-loop. Keep the two in step.
+ */
+const DEFAULT_BUDGET_MS = 50_000;
 
 /**
  * Outcome of one drain run. `queued` is the backlog matching the drain filter

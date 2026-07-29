@@ -25,6 +25,18 @@ function statusVariant(status: string) {
   return "success" as const;
 }
 
+/**
+ * Below lg every cell is a labelled row of its own (the <thead> is hidden), so
+ * the table reads as a stack on a phone without a second copy of the list in the
+ * DOM. `before:content-[attr(data-label)]` prints the column name from the cell's
+ * own data-label attribute.
+ */
+const CELL = cn(
+  "flex items-baseline justify-between gap-4 px-0 py-0.5",
+  "before:content-[attr(data-label)] before:text-soft before:text-[12px] before:font-medium",
+  "lg:table-cell lg:p-2 lg:before:content-none",
+);
+
 export default async function AdminBookingsPage({
   params,
   searchParams,
@@ -70,53 +82,20 @@ export default async function AdminBookingsPage({
         ))}
       </div>
 
-      {/* Eight columns don't fit a phone, so below lg the same rows render as
-          stacked cards - refunding a waitlister shouldn't need a sideways swipe
-          past six columns to reach the buttons. */}
-      <div className="mt-4 flex flex-col gap-3 lg:hidden">
-        {filtered.map((r) => (
-          <Card key={r.id} padding="sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-mono text-[13px]">{r.reference}</div>
-                <div className="text-[14px] font-semibold">{r.studentName}</div>
-                <div className="break-all text-[11px] text-soft">{r.studentEmail}</div>
-              </div>
-              <Pill variant={statusVariant(r.status)}>{r.status}</Pill>
-            </div>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line-2 pt-3 text-[13px]">
-              <dt className="text-soft">Trip cost</dt>
-              <dd className="text-right"><Money pence={r.tripCost} /></dd>
-              <dt className="text-soft">Paid</dt>
-              <dd className="text-right"><Money pence={r.paidToTrip} /></dd>
-              <dt className="text-soft">Balance</dt>
-              <dd className="text-right">
-                {noBalance(r.status) ? <span className="text-soft">-</span> : <Money pence={r.balance} />}
-              </dd>
-              <dt className="text-soft">Damage</dt>
-              <dd className="text-right">{r.damageStatus ?? "-"}</dd>
-            </dl>
-            <div className="mt-3">
-              <BookingActions
-                    bookingId={r.id}
-                    tripId={id}
-                    status={r.status}
-                    damageStatus={r.damageStatus}
-                    reference={r.reference}
-                    refundableTotal={r.refundableTotal}
-                    damageRefundAmount={r.damageRefundAmount}
-                  />
-            </div>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <Card padding="sm" className="text-center text-soft">{emptyLabel}</Card>
-        )}
-      </div>
+      {/*
+        ONE render of the list, not two. This used to be a stacked-card list for
+        phones plus a table for desktop, both always in the DOM with CSS hiding
+        one - so a full 300-place trip shipped 600 rows and mounted 600
+        BookingActions client components, half of them invisible.
 
-      <Card className="mt-4 hidden overflow-x-auto lg:block" padding="sm">
+        It is a real <table> at lg and above. Below that, each row becomes a
+        stacked block: the header is hidden and every cell prints its own label
+        from data-label, so the semantics and the single DOM tree survive without
+        an 830px sideways scroll on a phone.
+      */}
+      <Card className="mt-4 lg:overflow-x-auto" padding="sm">
         <table className="w-full text-left text-[13px]">
-          <thead className="text-soft">
+          <thead className="hidden text-soft lg:table-header-group">
             <tr className="border-b border-line">
               <th className="p-2 font-medium">Reference</th>
               <th className="p-2 font-medium">Student</th>
@@ -128,28 +107,41 @@ export default async function AdminBookingsPage({
               <th className="p-2 text-right font-medium">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block lg:table-row-group">
             {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-line-2 align-top">
-                <td className="p-2 font-mono">{r.reference}</td>
-                <td className="p-2">
-                  <div>{r.studentName}</div>
-                  <div className="break-all text-[11px] text-soft">{r.studentEmail}</div>
+              <tr
+                key={r.id}
+                className={cn(
+                  "block border-b border-line-2 py-3 first:pt-0 last:border-0",
+                  "lg:table-row lg:py-0 lg:align-top",
+                )}
+              >
+                <td className={cn(CELL, "font-mono")} data-label="Reference">
+                  {r.reference}
                 </td>
-                <td className="p-2">
+                <td className={CELL} data-label="Student">
+                  <div className="min-w-0 text-right lg:text-left">
+                    <div>{r.studentName}</div>
+                    <div className="break-all text-[11px] text-soft">{r.studentEmail}</div>
+                  </div>
+                </td>
+                <td className={CELL} data-label="Status">
                   <Pill variant={statusVariant(r.status)}>{r.status}</Pill>
                 </td>
-                <td className="p-2 text-right"><Money pence={r.tripCost} /></td>
-                <td className="p-2 text-right"><Money pence={r.paidToTrip} /></td>
-                <td className="p-2 text-right">
-                  {noBalance(r.status) ? (
-                    <span className="text-soft">-</span>
-                  ) : (
-                    <Money pence={r.balance} />
-                  )}
+                <td className={cn(CELL, "lg:text-right")} data-label="Trip cost">
+                  <Money pence={r.tripCost} />
                 </td>
-                <td className="p-2">{r.damageStatus ?? "-"}</td>
-                <td className="p-2">
+                <td className={cn(CELL, "lg:text-right")} data-label="Paid">
+                  <Money pence={r.paidToTrip} />
+                </td>
+                <td className={cn(CELL, "lg:text-right")} data-label="Balance">
+                  {noBalance(r.status) ? <span className="text-soft">-</span> : <Money pence={r.balance} />}
+                </td>
+                <td className={cn(CELL, "lg:text-right")} data-label="Damage">
+                  {r.damageStatus ?? "-"}
+                </td>
+                {/* The actions need the full width on a phone, so no label here. */}
+                <td className="block pt-2 lg:table-cell lg:p-2">
                   <BookingActions
                     bookingId={r.id}
                     tripId={id}
@@ -163,7 +155,11 @@ export default async function AdminBookingsPage({
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="p-4 text-center text-soft">{emptyLabel}</td></tr>
+              <tr className="block lg:table-row">
+                <td className="block p-4 text-center text-soft lg:table-cell" colSpan={8}>
+                  {emptyLabel}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

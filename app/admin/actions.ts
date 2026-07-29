@@ -95,7 +95,14 @@ async function audit(
 function stripeRefusedRequest(e: unknown): boolean {
   // Every Stripe error extends Error and carries its class name in `type`.
   if (!(e instanceof Error) || !("type" in e)) return false;
-  return e.type === "StripeInvalidRequestError" || e.type === "StripeCardError";
+  return (
+    e.type === "StripeInvalidRequestError" ||
+    e.type === "StripeCardError" ||
+    // A reused idempotency key carrying different parameters: Stripe rejected the
+    // call outright, so no refund was created. Unambiguous, and treating it as
+    // ambiguous would leave the row claimed with the money still held.
+    e.type === "StripeIdempotencyError"
+  );
 }
 
 // ── Trips ────────────────────────────────────────────────────────────────
@@ -118,7 +125,20 @@ export interface TripInput {
   status: "draft" | "live" | "closed";
 }
 
-export async function saveTrip(tripId: string | null, input: TripInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+/**
+ * Saving a capacity BELOW the confirmed count is a real thing to have to record -
+ * a coach downsized, beds lost - and 20260729000300's trigger is deliberately
+ * one-directional so the database allows it (it only blocks raising
+ * confirmed_count PAST capacity). Refusing it outright left no way to record the
+ * truth from the CMS at all, contradicting the migration. So it is a confirmation
+ * rather than a refusal: the first call reports the conflict, and the caller
+ * repeats it with acknowledgeOversold to commit, which is audited.
+ */
+export async function saveTrip(
+  tripId: string | null,
+  input: TripInput,
+  opts: { acknowledgeOversold?: boolean } = {},
+): Promise<{ ok: true; id: string } | { ok: false; error: string; needsOversoldAck?: true }> {
   const user = await requireAdminMfa();
   const parsed = tripInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid trip data." };
@@ -135,15 +155,27 @@ export async function saveTrip(tripId: string | null, input: TripInput): Promise
       .maybeSingle();
     if (currentError) return { ok: false, error: currentError.message };
     if (!current) return { ok: false, error: "Could not find that trip." };
-    if (row.capacity < current.confirmed_count) {
+    const oversold = row.capacity < current.confirmed_count;
+    if (oversold && !opts.acknowledgeOversold) {
       return {
         ok: false,
-        error: `Capacity cannot be below the ${current.confirmed_count} bookings already confirmed.`,
+        needsOversoldAck: true,
+        error:
+          `This trip already has ${current.confirmed_count} confirmed bookings, so a capacity of ` +
+          `${row.capacity} leaves it oversold by ${current.confirmed_count - row.capacity}. ` +
+          `Save again to record it - no booking is cancelled, but the trip reads as full and every ` +
+          `later payment is waitlisted until confirmed_count falls back to capacity.`,
       };
     }
     const { error } = await admin.from("trips").update(row).eq("id", tripId);
     if (error) return { ok: false, error: error.message };
-    const logged = await audit(user, "trip_update", "trip", tripId, { status: row.status, capacity: row.capacity, base_price: row.base_price });
+    const logged = await audit(user, "trip_update", "trip", tripId, {
+      status: row.status,
+      capacity: row.capacity,
+      base_price: row.base_price,
+      // An oversold save is a deliberate, acknowledged act - record that it was.
+      ...(oversold ? { oversold_by: current.confirmed_count - row.capacity, acknowledged: true } : {}),
+    });
     if (!logged.ok) return logged;
     revalidatePath("/admin");
     revalidatePath(`/admin/trips/${tripId}`);
@@ -387,7 +419,13 @@ export async function refundDamage(bookingId: string, tripId: string, withheldAm
   try {
     const refund = await stripe.refunds.create(
       { payment_intent: piId, amount: refundAmount },
-      { idempotencyKey: `dd-refund:${dd.id}` },
+      // Keyed on the AMOUNT as well as the row: two legitimately different
+      // refund amounts for the same deposit (a withholding revised between
+      // attempts) would otherwise reuse one key, and Stripe answers a reused key
+      // carrying different parameters with an idempotency error rather than a
+      // refund - which stripeRefusedRequest treats as ambiguous, so the row stays
+      // claimed with no refund and no ledger row.
+      { idempotencyKey: `dd-refund:${dd.id}:${refundAmount}` },
     );
     refundId = refund.id;
   } catch (e) {

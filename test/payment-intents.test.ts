@@ -34,7 +34,6 @@ vi.mock("@/lib/stripe/server", () => ({
   stripe: {
     paymentIntents: { create: h.create, retrieve: h.retrieve, cancel: h.cancel },
   },
-  stripeWebhookSecret: "whsec_test_not_used_here",
 }));
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";

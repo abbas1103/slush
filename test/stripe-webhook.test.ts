@@ -18,8 +18,11 @@ const h = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.admin.value }));
 vi.mock("@/lib/stripe/server", () => ({
   stripe: { webhooks: { constructEvent: h.constructEvent } },
-  stripeWebhookSecret: "whsec_test",
 }));
+// The signing secret moved to its own module so a missing one fails only the
+// webhook, not the booking flow (review #5). Mock it here rather than relying on
+// vitest.config.ts's env, so the test controls what it verifies against.
+vi.mock("@/lib/stripe/webhook-secret", () => ({ stripeWebhookSecret: "whsec_test" }));
 
 const EVENT_ID = "evt_1TestEvent";
 const BOOKING_ID = "44444444-4444-4444-4444-444444444444";

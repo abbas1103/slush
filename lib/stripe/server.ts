@@ -22,10 +22,7 @@ import Stripe from "stripe";
  */
 const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
-function requireStripeSecret(
-  name: "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET",
-  buildPlaceholder: string,
-): string {
+function requireStripeSecret(name: "STRIPE_SECRET_KEY", buildPlaceholder: string): string {
   const value = process.env[name];
   if (value) return value;
   if (isBuildPhase) return buildPlaceholder;
@@ -34,13 +31,8 @@ function requireStripeSecret(
 
 export const stripe = new Stripe(requireStripeSecret("STRIPE_SECRET_KEY", "sk_test_placeholder"));
 
-/**
- * Webhook signing secret, verified at module load. Import this in the webhook
- * route instead of reading the env var there: a missing secret then fails the
- * module (HTTP 5xx, which Stripe retries and Sentry reports) rather than 400ing
- * every delivery for good.
- */
-export const stripeWebhookSecret = requireStripeSecret(
-  "STRIPE_WEBHOOK_SECRET",
-  "whsec_placeholder",
-);
+// The webhook SIGNING secret is validated in lib/stripe/webhook-secret.ts, which
+// only the webhook route imports. Keeping it here meant a deployment missing
+// just that one variable threw at module load for every importer of `stripe` -
+// taking down the whole booking flow and CMS for a fault that only affects
+// webhook verification.

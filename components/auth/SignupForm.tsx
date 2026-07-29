@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { SocialButtons } from "./SocialButtons";
-import { Turnstile, turnstileEnabled } from "./Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle } from "./Turnstile";
 
 export function SignupForm({ next }: { next: string }) {
   const router = useRouter();
@@ -18,6 +18,7 @@ export function SignupForm({ next }: { next: string }) {
   const [captcha, setCaptcha] = useState<string>();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const turnstile = useRef<TurnstileHandle>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +43,11 @@ export function SignupForm({ next }: { next: string }) {
     setLoading(false);
     if (error) {
       setError(error.message);
+      // A Turnstile token is single-use and Supabase has now redeemed it, so the
+      // next attempt would replay a spent token and fail on the CAPTCHA rather
+      // than on whatever the student actually got wrong. LoginForm already does
+      // this; SignupForm mounted the same widget with no ref.
+      turnstile.current?.reset();
       return;
     }
     // Email confirmation on → no active session yet; otherwise straight in.
@@ -87,7 +93,7 @@ export function SignupForm({ next }: { next: string }) {
         />
       </Field>
 
-      <Turnstile onToken={setCaptcha} />
+      <Turnstile ref={turnstile} onToken={setCaptcha} />
 
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? "Creating account…" : "Create account"}

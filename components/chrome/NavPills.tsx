@@ -35,6 +35,10 @@ export function NavPills() {
             aria-current={active ? "page" : undefined}
             className={cn(
               "rounded-full px-3 py-1.5 whitespace-nowrap text-[13px] font-medium transition-colors",
+              // Same 44px coarse-pointer floor Button size="sm" takes. These pills
+              // only became touch targets when the mobile nav was added, and at
+              // py-1.5 they were about 31px. Desktop stays pixel-identical.
+              "[@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center",
               active ? "bg-ink text-white" : "text-soft hover:text-ink",
             )}
           >

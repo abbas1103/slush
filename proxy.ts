@@ -150,6 +150,12 @@ export const config = {
     // those responses got no CSP and no session refresh (audit #120). There is no
     // public/ directory, so it was protecting nothing; if assets are added later,
     // exclude their prefix instead of a suffix.
-    '/((?!_next/static|_next/image|favicon.ico|monitoring).*)',
+    //
+    // icon.svg and robots.txt are named explicitly: both are PRERENDERED, so they
+    // are the two routes the INVARIANT above permits to skip the nonce, and
+    // matching them would mean a Supabase getUser() round trip (and a Set-Cookie
+    // carrying rotated auth cookies) on every favicon revalidation. Named paths,
+    // not a suffix pattern - that is what audit #120 was about.
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|monitoring).*)',
   ],
 }

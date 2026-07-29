@@ -2,6 +2,14 @@ import "server-only";
 import type { CrmAdapter, CrmBooking, CrmContact } from "./types";
 
 /**
+ * Per-request timeout for Zoho calls. Without one, a single hung connection
+ * consumes the drain's whole wall-clock budget and every other queued event
+ * waits for the next cron run. An abort surfaces as a normal failure, so the row
+ * is retried with its attempt count incremented rather than lost.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+
+/**
  * An adapter plus whether it actually delivers anywhere. The outbox drain must
  * never mark a row 'sent' for an adapter that delivers nothing, or the queue is
  * consumed and there is nothing left to replay once a real CRM is configured
@@ -91,6 +99,7 @@ class ZohoCrmAdapter implements CrmAdapter {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const json = (await res.json().catch(() => ({}))) as ZohoTokenResponse;
     if (!res.ok || !json.access_token) {
@@ -113,6 +122,7 @@ class ZohoCrmAdapter implements CrmAdapter {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const json = (await res.json().catch(() => ({}))) as ZohoResponse;
     if (!res.ok) {

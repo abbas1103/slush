@@ -28,7 +28,6 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 vi.mock("@/lib/stripe/server", () => ({
   stripe: { paymentIntents: { create: vi.fn(), retrieve: vi.fn(), cancel: vi.fn() } },
-  stripeWebhookSecret: "whsec_test_not_used_here",
 }));
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
