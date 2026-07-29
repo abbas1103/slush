@@ -1,9 +1,13 @@
 -- ─────────────────────────────────────────────────────────────────────────
 -- Seed: the first trip (Brumski Christmas Trip) with its code and all extras.
 -- Everything here is editable by admins later - nothing about it is hardcoded
--- in the app. Idempotent via fixed UUIDs + ON CONFLICT, so it is safe to re-run.
+-- in the app. Re-running it only FILLS GAPS: every insert is ON CONFLICT DO
+-- NOTHING (no target, so any unique clash is skipped), because DO UPDATE would
+-- overwrite exactly the admin-editable data the CMS owns - prices, capacity,
+-- trip status, whether a trip code is still active - with no audit_log entry.
+-- Change those in the admin CMS, never here.
 -- Prices in integer pence. Equipment prices are PROVISIONAL (brief: confirm
--- before launch); Race day / Railjam are TBC.
+-- before launch, in the CMS); Race day / Railjam are TBC.
 -- ─────────────────────────────────────────────────────────────────────────
 
 insert into public.trips
@@ -18,20 +22,13 @@ values
    15000, 5000, 10000, '2026-11-15', 300,
    'Seven nights in Alpe d''Huez with Brumski - 250km of sunny, south-facing pistes for every level, home to the Sarenne, one of the longest black runs in the world. One booking covers your stay, your lift pass and your trip tee.',
    'live')
-on conflict (id) do update set
-  name = excluded.name, organiser = excluded.organiser, resort = excluded.resort,
-  country = excluded.country, start_date = excluded.start_date, end_date = excluded.end_date,
-  nights = excluded.nights, base_price = excluded.base_price, base_inclusions = excluded.base_inclusions,
-  deposit_amount = excluded.deposit_amount, downpayment_amount = excluded.downpayment_amount,
-  damage_deposit_amount = excluded.damage_deposit_amount, balance_due_date = excluded.balance_due_date,
-  capacity = excluded.capacity, description = excluded.description, status = excluded.status;
+on conflict do nothing;
 
 insert into public.trip_codes (id, trip_id, code, active)
 values
   ('20000000-0000-0000-0000-000000000001',
    '10000000-0000-0000-0000-000000000001', 'BRUMSKI-DEC-26', true)
-on conflict (id) do update set
-  trip_id = excluded.trip_id, code = excluded.code, active = excluded.active;
+on conflict do nothing;
 
 insert into public.extras
   (id, trip_id, type, name, description, price, price_tbc, has_quality_tiers, single_select_group, sort_order, active)
@@ -49,10 +46,7 @@ values
   ('30000000-0000-0000-0000-00000000000b', '10000000-0000-0000-0000-000000000001', 'event', 'Race day', 'Details coming soon', null, true, false, null, 11, true),
   ('30000000-0000-0000-0000-00000000000c', '10000000-0000-0000-0000-000000000001', 'event', 'Railjam', 'Details coming soon', null, true, false, null, 12, true),
   ('30000000-0000-0000-0000-00000000000d', '10000000-0000-0000-0000-000000000001', 'other', 'Winter sports cover', 'Medical, piste closure, kit & cancellation', 4200, false, false, null, 13, true)
-on conflict (id) do update set
-  type = excluded.type, name = excluded.name, description = excluded.description, price = excluded.price,
-  price_tbc = excluded.price_tbc, has_quality_tiers = excluded.has_quality_tiers,
-  single_select_group = excluded.single_select_group, sort_order = excluded.sort_order, active = excluded.active;
+on conflict do nothing;
 
 insert into public.extra_tiers (id, extra_id, name, price, sort_order)
 values
@@ -60,5 +54,4 @@ values
   ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', 'Evolution', 9900, 2),
   ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', 'Performance', 12900, 3),
   ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000002', 'Excellence', 16900, 4)
-on conflict (id) do update set
-  extra_id = excluded.extra_id, name = excluded.name, price = excluded.price, sort_order = excluded.sort_order;
+on conflict do nothing;
