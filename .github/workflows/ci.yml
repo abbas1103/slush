@@ -24,6 +24,292 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+      - name: Dependency advisories (production deps)
+        run: |
+          # Human-readable copy in the log, then the gate.
+          npm audit --omit=dev || true
+          npm audit --omit=dev --json > audit.json || true
+          # Advisories with no forward fix on Next 16.x - npm's only offered
+          # "fix" is downgrading next to 9.3.3, so gating on them would fail the
+          # build for ever. Both are transitive through next and neither is
+          # reachable from student input:
+          #   postcss  GHSA-qx2v-qp2m-jg93 / GHSA-6g55-p6wh-862q / GHSA-r28c-9q8g-f849
+          #   sharp    GHSA-f88m-g3jw-g9cj
+          # ANY advisory not on this list fails the job. Remove entries when a
+          # fixed next ships; do not add one without saying why here.
+          # (Dev-only tooling is excluded via --omit=dev: the eslint chain's
+          # advisories need an eslint 10 major bump and never ship to students.)
+          known='["1117015","1124252","1124288","1124066"]'
+          new=$(jq -r --argjson known "$known" '[.vulnerabilities[]?.via[]? | select(type == "object") | .source | tostring] - $known | unique | join(" ")' audit.json)
+          if [ -n "$new" ]; then
+            echo "::error::unreviewed dependency advisories: $new - review at https://github.com/advisories"
+            exit 1
+          fi
+          echo "No unreviewed advisories in production dependencies."
+
+  # The database is the source of truth for money and capacity, so the SQL is
+  # tested here rather than only against a developer's machine. Nothing is
+  # hardcoded to a migration list: the CLI applies every file in
+  # supabase/migrations plus supabase/seed.sql, whatever is there.
+  database:
+    runs-on: ubuntu-latest
+    # Booting the local stack pulls containers; fail fast rather than hang.
+    timeout-minutes: 20
+    env:
+      DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # config.toml substitutes these for optional (disabled) providers; empty
+      # values keep the CLI from complaining about an unset variable.
+      OPENAI_API_KEY: ""
+      S3_HOST: ""
+      S3_REGION: ""
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: ""
+      SUPABASE_AUTH_EXTERNAL_APPLE_SECRET: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Docker is preinstalled on the runner. `start` applies every migration and
+      # the seed to an empty database.
+      - name: Start Supabase (applies every migration + the seed)
+        run: npx supabase start
+      # Then prove the whole set replays from scratch, in order, on its own -
+      # a migration that only works against the author's dev database fails here.
+      - name: Replay every migration from scratch
+        run: npx supabase db reset
+
+      - name: Assert schema hardening, the ledger and the capacity gate
+        run: |
+          set -euo pipefail
+          psql --version
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f - <<'SQL'
+          -- 1. The seed loaded the catalogue.
+          do $$
+          declare v_trips int; v_extras int; v_tiers int; v_codes int;
+          begin
+            select count(*) into v_trips  from public.trips;
+            select count(*) into v_extras from public.extras;
+            select count(*) into v_tiers  from public.extra_tiers;
+            select count(*) into v_codes  from public.trip_codes where active;
+            if v_trips < 1 or v_extras < 13 or v_tiers < 4 or v_codes < 1 then
+              raise exception 'seed did not load: trips=% extras=% tiers=% active codes=%',
+                v_trips, v_extras, v_tiers, v_codes;
+            end if;
+          end $$;
+
+          -- 2. Deny by default: RLS on every table in public, no exceptions.
+          do $$
+          declare v text;
+          begin
+            select string_agg(c.relname, ', ' order by c.relname) into v
+              from pg_class c
+              join pg_namespace n on n.oid = c.relnamespace
+             where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
+            if v is not null then
+              raise exception 'tables in public without row level security: %', v;
+            end if;
+          end $$;
+
+          -- 3. Money / capacity / admin functions must never be callable from a
+          --    browser session (anon or authenticated).
+          do $$
+          declare v text;
+          begin
+            select string_agg(p.proname || ' -> ' || r.rolname, ', ') into v
+              from pg_proc p
+              join pg_namespace n on n.oid = p.pronamespace
+              cross join (values ('anon'), ('authenticated')) as r(rolname)
+             where n.nspname = 'public'
+               and p.proname in ('record_payment_and_finalize', 'admin_convert_booking', 'expire_stale_holds')
+               and has_function_privilege(r.rolname, p.oid, 'execute');
+            if v is not null then
+              raise exception 'client roles can execute privileged functions: %', v;
+            end if;
+          end $$;
+
+          -- 4. The hold sweep is scheduled (hygiene: correctness does not depend
+          --    on it, but a missing job means holds pile up).
+          do $$
+          begin
+            if not exists (select 1 from cron.job where jobname = 'expire-stale-holds') then
+              raise exception 'pg_cron job expire-stale-holds is missing';
+            end if;
+          end $$;
+
+          -- 5. The ledger and the capacity gate, through the real RPCs. Fixture
+          --    ids are fixed so the RLS block and the lock proof can address them.
+          do $$
+          declare
+            v_trip    uuid;
+            v_trip2   uuid;
+            v_u1      uuid := '99999999-0000-0000-0000-0000000000a1';
+            v_u2      uuid := '99999999-0000-0000-0000-0000000000a2';
+            v_u3      uuid := '99999999-0000-0000-0000-0000000000a3';
+            v_b1      uuid := '99999999-0000-0000-0000-0000000000b1';
+            v_b2      uuid := '99999999-0000-0000-0000-0000000000b2';
+            v_b3      uuid := '99999999-0000-0000-0000-0000000000b3';
+            v_extra   uuid;
+            v_status  public.booking_status;
+            v_trippay int;
+            v_damage  int;
+            v_count   int;
+            v_rows    int;
+            v_cost    int;
+          begin
+            insert into public.trips
+              (name, organiser, resort, country, start_date, end_date, nights, base_price, capacity, status)
+              values ('CI gate', 'CI', 'Testville', 'France', '2030-01-10', '2030-01-17', 7, 43900, 1, 'live')
+              returning id into v_trip;
+            insert into public.trips
+              (name, organiser, resort, country, start_date, end_date, nights, base_price, capacity, status)
+              values ('CI full', 'CI', 'Testville', 'France', '2030-01-10', '2030-01-17', 7, 43900, 5, 'live')
+              returning id into v_trip2;
+
+            -- public.users is mirrored from auth.users by the signup trigger.
+            insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at, created_at, updated_at)
+            values
+              ('00000000-0000-0000-0000-000000000000', v_u1, 'authenticated', 'authenticated', 'ci1@example.com', now(), now(), now()),
+              ('00000000-0000-0000-0000-000000000000', v_u2, 'authenticated', 'authenticated', 'ci2@example.com', now(), now(), now()),
+              ('00000000-0000-0000-0000-000000000000', v_u3, 'authenticated', 'authenticated', 'ci3@example.com', now(), now(), now());
+
+            insert into public.bookings (id, user_id, trip_id, reference, status)
+              values (v_b1, v_u1, v_trip, 'CI-0001', 'pending'),
+                     (v_b2, v_u2, v_trip, 'CI-0002', 'pending'),
+                     (v_b3, v_u3, v_trip2, 'CI-0003', 'pending');
+
+            -- A GBP 150 deposit: GBP 50 to the trip, GBP 100 held separately.
+            v_status := public.record_payment_and_finalize(v_b1, 'pi_ci_1', 'ch_ci_1', 'deposit', 15000);
+            if v_status <> 'confirmed' then
+              raise exception 'first deposit should confirm, got %', v_status;
+            end if;
+            select amount into v_trippay from public.payments where booking_id = v_b1 and type = 'deposit';
+            select amount into v_damage  from public.payments where booking_id = v_b1 and type = 'damage_deposit_hold';
+            if v_trippay <> 5000 or v_damage <> 10000 then
+              raise exception 'deposit ledger wrong: to trip=% damage held=%', v_trippay, v_damage;
+            end if;
+            if public.booking_balance(v_b1) <> 43900 - 5000 then
+              raise exception 'balance after deposit wrong: %', public.booking_balance(v_b1);
+            end if;
+
+            -- Stripe re-delivers the same event: no duplicate ledger rows, no
+            -- second seat consumed.
+            perform public.record_payment_and_finalize(v_b1, 'pi_ci_1', 'ch_ci_1', 'deposit', 15000);
+            select count(*)        into v_rows  from public.payments where booking_id = v_b1;
+            select confirmed_count into v_count from public.trips    where id = v_trip;
+            if v_rows <> 2 or v_count <> 1 then
+              raise exception 'replay not idempotent: ledger rows=% confirmed_count=%', v_rows, v_count;
+            end if;
+
+            -- Capacity 1 is now full: the next payment is waitlisted, and the
+            -- confirmed count never overruns capacity.
+            v_status := public.record_payment_and_finalize(v_b2, 'pi_ci_2', 'ch_ci_2', 'deposit', 15000);
+            select confirmed_count into v_count from public.trips where id = v_trip;
+            if v_status <> 'waitlisted' or v_count <> 1 then
+              raise exception 'capacity gate failed: status=% confirmed_count=%', v_status, v_count;
+            end if;
+
+            -- Pay in full records the trip money ACTUALLY captured (charge minus
+            -- the damage deposit) and clears the balance to zero.
+            insert into public.extras (trip_id, type, name, price, sort_order)
+              values (v_trip2, 'transport', 'Return coach transport', 23900, 1) returning id into v_extra;
+            insert into public.booking_extras (booking_id, extra_id, quantity, price_at_booking)
+              values (v_b3, v_extra, 1, 23900);
+            v_cost := public.compute_trip_cost(v_b3);
+            if v_cost <> 43900 + 23900 then
+              raise exception 'trip cost wrong: %', v_cost;
+            end if;
+            v_status := public.record_payment_and_finalize(v_b3, 'pi_ci_3', 'ch_ci_3', 'full', v_cost + 10000);
+            select amount into v_trippay from public.payments where booking_id = v_b3 and type = 'deposit';
+            if v_status <> 'confirmed' or v_trippay <> v_cost or public.booking_balance(v_b3) <> 0 then
+              raise exception 'pay in full wrong: status=% to trip=% balance=%',
+                v_status, v_trippay, public.booking_balance(v_b3);
+            end if;
+
+            -- Fixtures for the lock proof in the next step (fixed ids so the
+            -- shell can address them). The booking is already confirmed, so the
+            -- 'balance' path below touches no capacity state.
+            insert into public.trips
+              (id, name, organiser, resort, country, start_date, end_date, nights, base_price, capacity, status)
+              values ('99999999-0000-0000-0000-000000000001', 'CI lock', 'CI', 'Testville', 'France',
+                      '2030-01-10', '2030-01-17', 7, 43900, 10, 'live');
+            insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at, created_at, updated_at)
+              values ('00000000-0000-0000-0000-000000000000', '99999999-0000-0000-0000-000000000002',
+                      'authenticated', 'authenticated', 'ci-lock@example.com', now(), now(), now());
+            insert into public.bookings (id, user_id, trip_id, reference, status)
+              values ('99999999-0000-0000-0000-000000000003', '99999999-0000-0000-0000-000000000002',
+                      '99999999-0000-0000-0000-000000000001', 'CI-LOCK', 'confirmed');
+          end $$;
+          SQL
+
+          # 6. RLS in anger: as a real student session (role authenticated + a
+          #    request.jwt.claims sub, exactly what PostgREST sets), one student
+          #    must not see another's booking, ledger or profile. Rolled back, so
+          #    the fixtures above are untouched.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f - <<'SQL'
+          begin;
+          -- set_config with is_local = true is exactly how PostgREST injects the
+          -- verified JWT, so auth.uid() and is_admin_mfa() behave as in production.
+          select set_config('request.jwt.claims',
+                            '{"sub":"99999999-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+          set local role authenticated;
+          do $$
+          declare v_mine int; v_theirs int; v_users int;
+          begin
+            select count(*) into v_mine   from public.bookings where id = '99999999-0000-0000-0000-0000000000b1';
+            select count(*) into v_theirs from public.bookings where id = '99999999-0000-0000-0000-0000000000b2';
+            select count(*) into v_users  from public.users;
+            if v_mine <> 1 then raise exception 'student cannot read their own booking (RLS too tight)'; end if;
+            if v_theirs <> 0 then raise exception 'student can read another student''s booking'; end if;
+            if v_users <> 1 then raise exception 'student can read % profile rows, expected only their own', v_users; end if;
+
+            select count(*) into v_mine   from public.payments where booking_id = '99999999-0000-0000-0000-0000000000b1';
+            select count(*) into v_theirs from public.payments where booking_id = '99999999-0000-0000-0000-0000000000b2';
+            if v_mine <> 2 then raise exception 'student sees % of their own ledger rows, expected 2', v_mine; end if;
+            if v_theirs <> 0 then raise exception 'student can read another student''s payments'; end if;
+          end $$;
+          rollback;
+          SQL
+
+      # The capacity invariant depends on record_payment_and_finalize taking
+      # `SELECT ... FROM trips ... FOR UPDATE`. Two concurrent HTTP calls cannot
+      # prove that (they serialise by accident), so hold the row from one session
+      # and require the function to block in another. p_kind='balance' is the
+      # probe because that path takes no other lock on trips: if the FOR UPDATE
+      # were dropped, the call would sail straight through.
+      - name: Prove the capacity lock serialises payments
+        run: |
+          set -euo pipefail
+          TRIP=99999999-0000-0000-0000-000000000001
+          BOOKING=99999999-0000-0000-0000-000000000003
+          # One simple query string = one transaction, so the row stays locked
+          # for the whole 8 seconds.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q \
+            -c "select 1 from public.trips where id = '$TRIP' for update; select pg_sleep(8);" &
+          HOLDER=$!
+          sleep 2
+          if psql "$DB_URL" -v ON_ERROR_STOP=1 -q \
+            -c "set lock_timeout = '3s'; select public.record_payment_and_finalize('$BOOKING', 'pi_ci_lock', 'ch_ci_lock', 'balance', 1000);"; then
+            echo "::error::record_payment_and_finalize did not block while the trips row was locked - the capacity lock is gone"
+            kill "$HOLDER" 2>/dev/null || true
+            exit 1
+          fi
+          echo "Blocked as expected while the trips row was held."
+          wait "$HOLDER"
+          # Same call must now succeed, proving the block above was the lock and
+          # not a broken call.
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q \
+            -c "select public.record_payment_and_finalize('$BOOKING', 'pi_ci_lock', 'ch_ci_lock', 'balance', 1000);"
+          rows=$(psql "$DB_URL" -t -A \
+            -c "select count(*) from public.payments where stripe_payment_intent_id = 'pi_ci_lock' and type = 'balance' and amount = 1000;")
+          if [ "$rows" != "1" ]; then
+            echo "::error::balance payment was not recorded once (got $rows rows)"
+            exit 1
+          fi
+          echo "Balance payment recorded exactly once after the lock was released."
 
   secret-scan:
     runs-on: ubuntu-latest
