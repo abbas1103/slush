@@ -19,31 +19,37 @@ export default async function ConfirmationPage({
   const { bookingId } = await params;
   const supabase = await createClient();
 
-  const { data: booking } = await supabase
+  const { data: booking, error: bookingError } = await supabase
     .from("bookings")
-    .select("id, status, reference, trip_id")
+    .select("id, status, reference, trip_id, base_price_at_booking")
     .eq("id", bookingId)
     .maybeSingle();
+  // A failed read is not a missing booking - never show a 404 for one, least of
+  // all on the screen a student lands on straight after paying.
+  if (bookingError) throw new Error(bookingError.message);
   if (!booking) notFound();
 
-  const { data: trip } = await supabase
-    .from("trips")
-    .select("*")
-    .eq("id", booking.trip_id)
-    .maybeSingle();
+  // Everything else only needs the booking, so it goes in one wave.
+  const [tripRes, besRes, paymentsRes] = await Promise.all([
+    supabase.from("trips").select("*").eq("id", booking.trip_id).maybeSingle(),
+    supabase
+      .from("booking_extras")
+      .select("price_at_booking, quantity")
+      .eq("booking_id", bookingId),
+    supabase.from("payments").select("type, amount, status").eq("booking_id", bookingId),
+  ]);
+  if (tripRes.error) throw new Error(tripRes.error.message);
+  if (besRes.error) throw new Error(besRes.error.message);
+  if (paymentsRes.error) throw new Error(paymentsRes.error.message);
+  const trip = tripRes.data;
   if (!trip) notFound();
-
-  const { data: bes } = await supabase
-    .from("booking_extras")
-    .select("price_at_booking, quantity")
-    .eq("booking_id", bookingId);
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("type, amount, status")
-    .eq("booking_id", bookingId);
+  const bes = besRes.data;
+  const payments = paymentsRes.data;
 
   const pricing = computePricing({
-    basePrice: trip.base_price,
+    // Snapshot, not the live trip price - a later admin price edit must not
+    // rewrite the receipt a student was already shown.
+    basePrice: booking.base_price_at_booking ?? trip.base_price,
     depositAmount: trip.deposit_amount,
     downpaymentAmount: trip.downpayment_amount,
     damageDepositAmount: trip.damage_deposit_amount,
@@ -81,8 +87,8 @@ export default async function ConfirmationPage({
           <>
             <h1 className="text-white">You&apos;re on the waiting list ⏳</h1>
             <p className="mt-2 text-white/70">
-              You&apos;ve secured a waiting-list spot for {trip.name}. If a place opens up
-              we&apos;ll confirm you and email you - if not, we refund your deposit in full.
+              You&apos;ve secured a waiting-list spot for {trip.name}. If a place opens up we&apos;ll
+              confirm you and your dashboard will show it - if not, we refund your deposit in full.
             </p>
           </>
         ) : (
@@ -126,24 +132,56 @@ export default async function ConfirmationPage({
                 <div className="text-[22px] font-extrabold"><Money pence={balance} /></div>
               </div>
               <div>
-                <div className="text-[12.5px] text-soft">Pay by</div>
+                <div className="text-[12.5px] text-soft">{isWaitlist ? "Balance due by" : "Pay by"}</div>
                 <div className="text-[22px] font-extrabold">{formatDate(trip.balance_due_date)}</div>
               </div>
             </div>
+            {isWaitlist && (
+              <p className="mt-3 text-[12.5px] text-soft">
+                You only owe your balance if a place opens up and we confirm you.
+              </p>
+            )}
             {damageHeld && (
               <p className="mt-3 text-[12.5px] text-soft">
-                <Money pence={trip.damage_deposit_amount} stripZeros /> refundable damage deposit held -
-                returned to your card after the trip.
+                <Money pence={trip.damage_deposit_amount} stripZeros /> refundable damage deposit held -{" "}
+                {isWaitlist
+                  ? "refunded with your deposit if no place opens up."
+                  : "returned to your card after the trip."}
               </p>
             )}
             <div className="mt-6 border-t border-line pt-5">
               <h3 className="mb-2">What happens next</h3>
               <Timeline
-                items={[
-                  { title: "Now", desc: "Your place is reserved and your confirmation is on its way.", now: true },
-                  { title: "Any time", desc: `Pay off your balance before ${formatDate(trip.balance_due_date)}.` },
-                  { title: "7 days before", desc: "Your lift pass and event tickets unlock in the app." },
-                ]}
+                items={
+                  isWaitlist
+                    ? [
+                        {
+                          title: "Now",
+                          desc: `Your deposit is paid and you're in line for a place. Your reference is ${booking.reference}.`,
+                          now: true,
+                        },
+                        {
+                          title: "If a place opens up",
+                          desc: "We confirm you, your dashboard switches to a confirmed booking, and your balance opens for payment.",
+                        },
+                        { title: "If one doesn't", desc: "We refund your deposit in full." },
+                      ]
+                    : [
+                        {
+                          title: "Now",
+                          desc: `Your place is reserved under reference ${booking.reference}. Your dashboard has your booking, your balance and every payment.`,
+                          now: true,
+                        },
+                        {
+                          title: "Any time",
+                          desc: `Pay off your balance before ${formatDate(trip.balance_due_date)}.`,
+                        },
+                        {
+                          title: "Once your balance is cleared",
+                          desc: "Your lift pass and event tickets unlock in the app (or automatically 7 days before travel).",
+                        },
+                      ]
+                }
               />
             </div>
           </Card>
@@ -153,11 +191,23 @@ export default async function ConfirmationPage({
               ⊞ Go to my dashboard
             </Link>
             <Card padding="sm">
-              <div className="text-[13px] font-semibold">Pay at your own pace</div>
-              <p className="mt-1 text-[13px] text-soft">
-                Top up your balance any time before {formatDate(trip.balance_due_date)} - in one go or
-                bit by bit. (Dashboard &amp; tickets arrive in the next slice.)
-              </p>
+              {isWaitlist ? (
+                <>
+                  <div className="text-[13px] font-semibold">Keep an eye on your dashboard</div>
+                  <p className="mt-1 text-[13px] text-soft">
+                    Your waiting-list place, your reference and every payment are there. We don&apos;t
+                    ask for your balance unless a place opens up.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-[13px] font-semibold">Pay at your own pace</div>
+                  <p className="mt-1 text-[13px] text-soft">
+                    Top up your balance any time before {formatDate(trip.balance_due_date)} - in one go
+                    or bit by bit, from your dashboard.
+                  </p>
+                </>
+              )}
             </Card>
           </aside>
         </div>

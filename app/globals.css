@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────────────
-   SLUSH design tokens - mirrored exactly from slush-booking-prototype.html.
+   SLUSH design tokens - mirrored from slush-booking-prototype.html, with two
+   deliberate deviations: --color-soft and --color-placeholder are darkened,
+   because the prototype's values fail WCAG AA for text (see below).
    Tailwind v4 CSS-first config: these generate utilities
    (bg-ink, text-soft, border-line, rounded-card, font-sans, sm:/md:/lg:/xl:).
    ───────────────────────────────────────────────────────────────────────── */
@@ -10,7 +12,9 @@
   --color-ink: #0E0E10;
   --color-ink-2: #3F3F46;
   --color-ink-hover: #26262B;
-  --color-soft: #71717A;
+  /* Secondary text. The prototype's #71717A is 4.40:1 on --color-bg, which most
+     page intro copy sits on; this is 5.8:1 there and 6.4:1 on white. */
+  --color-soft: #5F5F68;
   --color-line: #E5E7EB;
   --color-line-2: #EEEEF0;
   --color-bg: #F4F4F5;
@@ -20,7 +24,9 @@
   /* Fills / helpers */
   --color-chip: #F1F1F2;
   --color-soft-panel: #F7F7F8;
-  --color-placeholder: #A1A1AA;
+  /* Placeholders are real text and need 4.5:1: the prototype's #A1A1AA is
+     2.56:1 on white, this is 4.6:1, still a step lighter than --color-soft. */
+  --color-placeholder: #75757F;
   --color-track: #EBEBED;
 
   /* Success (green pill) */
@@ -75,15 +81,41 @@
     font-weight: 700;
   }
 
-  /* Consistent focus ring across interactive elements */
+  /* Consistent focus ring across interactive elements. The colour is a variable
+     so dark surfaces can flip it: an ink ring on bg-panel is drawn in the
+     background colour and is invisible. */
+  :root {
+    --focus-ring: var(--color-ink);
+  }
+
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  /* Any dark surface (bg-panel cards, the footer, the auth aside) inherits a
+     white ring down to its focusable children. Add data-tone="dark" to a dark
+     surface that is not painted with bg-panel. */
+  .bg-panel,
+  [data-tone="dark"] {
+    --focus-ring: #FFFFFF;
   }
 
   /* Placeholder colour to match the prototype */
   ::placeholder {
     color: var(--color-placeholder);
+  }
+
+  /* iOS Safari zooms the viewport whenever a focused control computes under
+     16px, and never zooms back out, so controls are 16px below the desktop
+     breakpoint. Utilities beat this base rule, so components/ui/Input.tsx
+     carries the same step for the shared Input / Textarea / Select. */
+  @media (max-width: 819px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }
 

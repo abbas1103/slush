@@ -29,18 +29,24 @@ export function HoldModal({
   onFinish: () => void;
   onRelease: () => void;
 }) {
-  const [remaining, setRemaining] = useState(0);
+  const [clock, setClock] = useState<{ deadline: number; remaining: number } | null>(null);
 
   useEffect(() => {
     if (!open || !expiresAt) return;
     const deadline = new Date(expiresAt).getTime();
-    const tick = () => setRemaining(deadline - Date.now());
+    const tick = () => setClock({ deadline, remaining: deadline - Date.now() });
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [open, expiresAt]);
 
-  const expired = remaining <= 0;
+  // The countdown only counts once it has been read for THIS hold. The effect
+  // runs after the first paint, so treating "not read yet" as 0 would flash
+  // "0:00" and "your place has been released" at the very moment a place was
+  // reserved - and would show the previous hold's time on a reopen (audit #77).
+  const deadline = expiresAt ? new Date(expiresAt).getTime() : 0;
+  const current = clock && clock.deadline === deadline ? clock : null;
+  const expired = current !== null && current.remaining <= 0;
 
   return (
     <Modal open={open} onClose={onRelease} labelledBy="hold-title" dismissible={false}>
@@ -49,7 +55,7 @@ export function HoldModal({
       </h2>
       <div className="mt-4 text-center">
         <div className="text-[40px] font-extrabold tabular-nums">
-          {expired ? "0:00" : format(remaining)}
+          {current ? format(current.remaining) : "--:--"}
         </div>
         <div className="text-[12px] text-soft">remaining</div>
       </div>

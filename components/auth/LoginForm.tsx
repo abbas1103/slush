@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { SocialButtons } from "./SocialButtons";
-import { Turnstile, turnstileEnabled } from "./Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle } from "./Turnstile";
 
 export function LoginForm({
   next,
@@ -28,6 +27,7 @@ export function LoginForm({
   const [captcha, setCaptcha] = useState<string>();
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [loading, setLoading] = useState(false);
+  const turnstile = useRef<TurnstileHandle>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +45,8 @@ export function LoginForm({
     setLoading(false);
     if (error) {
       setError(error.message);
+      // The token has been redeemed, so the next attempt needs a fresh one.
+      turnstile.current?.reset();
       return;
     }
     router.push(next);
@@ -90,26 +92,25 @@ export function LoginForm({
             autoComplete="current-password"
             className="pr-14"
           />
+          {/* size-11 keeps the label where it was but gives it a 44px target. */}
           <button
             type="button"
             onClick={() => setShowPwd((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-medium text-soft"
+            aria-label={showPwd ? "Hide password" : "Show password"}
+            className="absolute right-0.5 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-btn text-[12px] font-medium text-soft"
           >
             {showPwd ? "hide" : "show"}
           </button>
         </div>
       </Field>
 
-      <div className="flex items-center justify-between">
-        <Checkbox defaultChecked>
-          <span className="text-[13px]">Remember me</span>
-        </Checkbox>
+      <div className="flex justify-end">
         <Link href="/reset" className="text-[13px] font-medium text-ink underline">
           Forgot password?
         </Link>
       </div>
 
-      <Turnstile onToken={setCaptcha} />
+      <Turnstile ref={turnstile} onToken={setCaptcha} />
 
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? "Logging in…" : "Log in"}

@@ -48,6 +48,27 @@ export default async function TicketsPage() {
       >
         {unlocked ? (
           <div className="font-semibold">✓ Tickets active - show these QR codes in resort.</div>
+        ) : booking.status === "pending" ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">🔒 Finish your booking to unlock tickets</div>
+              <div className="mt-1 text-[13px] text-white/70">
+                You haven&apos;t paid your deposit yet. Pay it to confirm your place, then your QR
+                tickets activate once your balance is cleared.
+              </div>
+            </div>
+            <Link href={`/book/${booking.id}/payment`} className={buttonVariants({ variant: "out" }) + " inline-flex"}>
+              Complete your booking
+            </Link>
+          </div>
+        ) : booking.status === "waitlisted" ? (
+          <div>
+            <div className="font-semibold">🕓 You&apos;re on the waiting list</div>
+            <div className="mt-1 text-[13px] text-white/70">
+              Your deposit is paid and you&apos;re in line for a place. We&apos;ll be in touch if one
+              opens up - tickets activate once you have a confirmed place.
+            </div>
+          </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminTripBookings } from "@/lib/db/admin-queries";
@@ -9,7 +10,20 @@ import { BookingActions } from "@/components/admin/BookingActions";
 import { cn } from "@/lib/utils/cn";
 import { requireAdminMfa } from "@/lib/auth/guards";
 
+export const metadata: Metadata = {
+  title: "Bookings - SLUSH admin",
+  // Staff surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
+
 const FILTERS = ["all", "confirmed", "waitlisted", "converted", "refunded", "pending"];
+
+/** Pill colour for a booking status - shared by the table and the phone cards. */
+function statusVariant(status: string) {
+  if (status === "waitlisted" || status === "refunded") return "error" as const;
+  if (status === "pending") return "tag" as const;
+  return "success" as const;
+}
 
 export default async function AdminBookingsPage({
   params,
@@ -26,6 +40,8 @@ export default async function AdminBookingsPage({
 
   const active = status && FILTERS.includes(status) ? status : "all";
   const filtered = active === "all" ? rows : rows.filter((r) => r.status === active);
+  const emptyLabel = `No bookings${active !== "all" ? ` with status "${active}"` : ""}.`;
+  const noBalance = (s: string) => s === "cancelled" || s === "refunded";
 
   return (
     <div>
@@ -54,7 +70,43 @@ export default async function AdminBookingsPage({
         ))}
       </div>
 
-      <Card className="mt-4 overflow-x-auto" padding="sm">
+      {/* Eight columns don't fit a phone, so below lg the same rows render as
+          stacked cards - refunding a waitlister shouldn't need a sideways swipe
+          past six columns to reach the buttons. */}
+      <div className="mt-4 flex flex-col gap-3 lg:hidden">
+        {filtered.map((r) => (
+          <Card key={r.id} padding="sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-mono text-[13px]">{r.reference}</div>
+                <div className="text-[14px] font-semibold">{r.studentName}</div>
+                <div className="break-all text-[11px] text-soft">{r.studentEmail}</div>
+              </div>
+              <Pill variant={statusVariant(r.status)}>{r.status}</Pill>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line-2 pt-3 text-[13px]">
+              <dt className="text-soft">Trip cost</dt>
+              <dd className="text-right"><Money pence={r.tripCost} /></dd>
+              <dt className="text-soft">Paid</dt>
+              <dd className="text-right"><Money pence={r.paidToTrip} /></dd>
+              <dt className="text-soft">Balance</dt>
+              <dd className="text-right">
+                {noBalance(r.status) ? <span className="text-soft">-</span> : <Money pence={r.balance} />}
+              </dd>
+              <dt className="text-soft">Damage</dt>
+              <dd className="text-right">{r.damageStatus ?? "-"}</dd>
+            </dl>
+            <div className="mt-3">
+              <BookingActions bookingId={r.id} tripId={id} status={r.status} damageStatus={r.damageStatus} />
+            </div>
+          </Card>
+        ))}
+        {filtered.length === 0 && (
+          <Card padding="sm" className="text-center text-soft">{emptyLabel}</Card>
+        )}
+      </div>
+
+      <Card className="mt-4 hidden overflow-x-auto lg:block" padding="sm">
         <table className="w-full text-left text-[13px]">
           <thead className="text-soft">
             <tr className="border-b border-line">
@@ -74,16 +126,20 @@ export default async function AdminBookingsPage({
                 <td className="p-2 font-mono">{r.reference}</td>
                 <td className="p-2">
                   <div>{r.studentName}</div>
-                  <div className="text-[11px] text-soft">{r.studentEmail}</div>
+                  <div className="break-all text-[11px] text-soft">{r.studentEmail}</div>
                 </td>
                 <td className="p-2">
-                  <Pill variant={r.status === "waitlisted" || r.status === "refunded" ? "error" : r.status === "pending" ? "tag" : "success"}>
-                    {r.status}
-                  </Pill>
+                  <Pill variant={statusVariant(r.status)}>{r.status}</Pill>
                 </td>
                 <td className="p-2 text-right"><Money pence={r.tripCost} /></td>
                 <td className="p-2 text-right"><Money pence={r.paidToTrip} /></td>
-                <td className="p-2 text-right"><Money pence={r.balance} /></td>
+                <td className="p-2 text-right">
+                  {noBalance(r.status) ? (
+                    <span className="text-soft">-</span>
+                  ) : (
+                    <Money pence={r.balance} />
+                  )}
+                </td>
                 <td className="p-2">{r.damageStatus ?? "-"}</td>
                 <td className="p-2">
                   <BookingActions bookingId={r.id} tripId={id} status={r.status} damageStatus={r.damageStatus} />
@@ -91,7 +147,7 @@ export default async function AdminBookingsPage({
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="p-4 text-center text-soft">No bookings{active !== "all" ? ` with status "${active}"` : ""}.</td></tr>
+              <tr><td colSpan={8} className="p-4 text-center text-soft">{emptyLabel}</td></tr>
             )}
           </tbody>
         </table>

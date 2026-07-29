@@ -1,32 +1,32 @@
 import Link from "next/link";
 
-type Item = string | { label: string; href: string };
+/** Every footer item is a link - text styled like a link but with no
+ *  destination is indistinguishable from a real one on touch. */
+type Item = { label: string; href: string };
 
 function FooterCol({ title, items }: { title: string; items: Item[] }) {
   return (
     <div>
       <div className="text-[13px] font-semibold text-white">{title}</div>
       <ul className="mt-3 flex flex-col gap-2 text-[13px] text-white/60">
-        {items.map((i) => {
-          const label = typeof i === "string" ? i : i.label;
-          return (
-            <li key={label}>
-              {typeof i === "string" ? (
-                label
-              ) : (
-                <Link href={i.href} className="hover:text-white">
-                  {label}
-                </Link>
-              )}
-            </li>
-          );
-        })}
+        {items.map((i) => (
+          <li key={i.href}>
+            <Link href={i.href} className="hover:text-white">
+              {i.label}
+            </Link>
+          </li>
+        ))}
       </ul>
     </div>
   );
 }
 
-/** Dark 4-column footer (Book / Help / Legal), matching the prototype. */
+/**
+ * Dark 4-column footer (Book / Help / Legal), matching the prototype's layout.
+ * The prototype's marketing items (Lift passes, Equipment hire, Travel info)
+ * are dropped until those pages exist - they are extras chosen inside the
+ * booking flow, not destinations.
+ */
 export function Footer() {
   return (
     <footer className="mt-16 bg-panel text-white">
@@ -38,8 +38,14 @@ export function Footer() {
             university snowsports societies.
           </p>
         </div>
-        <FooterCol title="Book" items={["Ski trips", "Lift passes", "Equipment hire"]} />
-        <FooterCol title="Help" items={["Contact us", "Manage booking", "Travel info"]} />
+        <FooterCol title="Book" items={[{ label: "Enter a trip code", href: "/trip" }]} />
+        <FooterCol
+          title="Help"
+          items={[
+            { label: "Get help", href: "/help" },
+            { label: "Manage booking", href: "/dashboard" },
+          ]}
+        />
         <FooterCol
           title="Legal"
           items={[
