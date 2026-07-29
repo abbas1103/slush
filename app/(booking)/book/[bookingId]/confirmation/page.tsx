@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computePricing } from "@/lib/pricing/compute";
-import { computePaidToTrip } from "@/lib/db/queries";
+import { computePaidToTrip, TRIP_COLUMNS } from "@/lib/db/queries";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
@@ -32,7 +32,7 @@ export default async function ConfirmationPage({
 
   // Everything else only needs the booking, so it goes in one wave.
   const [tripRes, besRes, paymentsRes] = await Promise.all([
-    supabase.from("trips").select("*").eq("id", booking.trip_id).maybeSingle(),
+    supabase.from("trips").select(TRIP_COLUMNS).eq("id", booking.trip_id).maybeSingle(),
     supabase
       .from("booking_extras")
       .select("price_at_booking, quantity")

@@ -12,6 +12,26 @@ export function assertRead(error: { message: string } | null, what: string): voi
   if (error) throw new Error(`Could not load ${what}: ${error.message}`);
 }
 
+/**
+ * Every trips column EXCEPT capacity and confirmed_count.
+ *
+ * The brief forbids surfacing a remaining-places number: the trip page shows a
+ * boolean "full" from trip_effective_full() and nothing finer. Reading trips with
+ * `select("*")` pulled both counters into the RSC payload of every booking and
+ * dashboard page, and left a signed-in student able to GET
+ * /rest/v1/trips?select=capacity,confirmed_count straight off PostgREST.
+ *
+ * These are the same 17 columns 20260729000300 grants to `anon`, so a
+ * column-level grant can now be applied to `authenticated` too - which is only
+ * safe BECAUSE these reads are narrowed: under a column grant, `select("*")`
+ * fails outright rather than returning a subset.
+ */
+export const TRIP_COLUMNS =
+  "id, name, organiser, resort, country, start_date, end_date, nights, base_price, base_inclusions, deposit_amount, downpayment_amount, damage_deposit_amount, balance_due_date, description, status, created_at";
+
+/** A trip as the student-facing app may see it: no capacity, no confirmed_count. */
+export type PublicTrip = Omit<Tables<"trips">, "capacity" | "confirmed_count">;
+
 /** The payments-ledger fields the money maths needs, whichever query fetched them. */
 export interface LedgerRow {
   type: string;
@@ -43,7 +63,7 @@ export type ExtraWithTiers = Tables<"extras"> & {
 };
 
 export interface TripDetail {
-  trip: Tables<"trips">;
+  trip: PublicTrip;
   extras: ExtraWithTiers[];
   isFull: boolean;
 }
@@ -70,7 +90,7 @@ export async function getTripByCode(code: string): Promise<TripDetail | null> {
     { data: extras, error: extrasError },
     { data: isFull, error: fullError },
   ] = await Promise.all([
-    supabase.from("trips").select("*").eq("id", tripId).maybeSingle(),
+    supabase.from("trips").select(TRIP_COLUMNS).eq("id", tripId).maybeSingle(),
     supabase
       .from("extras")
       .select("*, extra_tiers(*)")
@@ -113,7 +133,7 @@ export interface BookingContext {
     | "access_needs"
     | "base_price_at_booking"
   >;
-  trip: Tables<"trips">;
+  trip: PublicTrip;
   extras: ExtraWithTiers[];
   selected: SelectedExtra[];
 }
@@ -154,7 +174,7 @@ export async function getBookingContext(
     { data: extras, error: extrasError },
     { data: selected, error: selectedError },
   ] = await Promise.all([
-    supabase.from("trips").select("*").eq("id", booking.trip_id).maybeSingle(),
+    supabase.from("trips").select(TRIP_COLUMNS).eq("id", booking.trip_id).maybeSingle(),
     supabase
       .from("extras")
       .select("*, extra_tiers(*)")
@@ -185,7 +205,7 @@ export interface PaymentRow extends LedgerRow {
 
 export interface MyBooking {
   booking: Pick<Tables<"bookings">, "id" | "status" | "reference" | "trip_id" | "created_at">;
-  trip: Tables<"trips">;
+  trip: PublicTrip;
   pricing: Pricing;
   paidToTrip: number;
   balance: number;
@@ -243,7 +263,7 @@ export async function getMyBooking(): Promise<MyBooking | null> {
     { data: payments, error: paymentsError },
     { data: dd, error: ddError },
   ] = await Promise.all([
-    supabase.from("trips").select("*").eq("id", booking.trip_id).maybeSingle(),
+    supabase.from("trips").select(TRIP_COLUMNS).eq("id", booking.trip_id).maybeSingle(),
     supabase
       .from("booking_extras")
       .select("price_at_booking, quantity, extras(name, type), extra_tiers(name)")
