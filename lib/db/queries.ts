@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth/user";
 import type { Enums, Tables } from "@/lib/db/types";
 import { computePricing, type Pricing } from "@/lib/pricing/compute";
 
@@ -146,10 +147,9 @@ export interface BookingContext {
 export async function getBookingContext(
   bookingId: string,
 ): Promise<BookingContext | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached, so a layout's guard has usually already paid for this and it
+  // costs nothing here (lib/auth/user.ts). Still a verified read, not getSession().
+  const [supabase, user] = await Promise.all([createClient(), getUser()]);
   if (!user) return null;
 
   const { data: booking, error: bookingError } = await supabase
@@ -229,10 +229,9 @@ const LIVE_STATUSES: Enums<"booking_status">[] = ["pending", "confirmed", "waitl
  * Returns null if they have none.
  */
 export async function getMyBooking(): Promise<MyBooking | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // See getBookingContext: request-cached verified read, usually already resolved
+  // by the (dashboard) layout's requireUser().
+  const [supabase, user] = await Promise.all([createClient(), getUser()]);
   if (!user) return null;
 
   // Filter on user_id explicitly. RLS is defence in depth here, not the filter:

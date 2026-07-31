@@ -1,20 +1,20 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth/user";
 
 /**
  * Authorization guards. All authorize on `getUser()` (verifies the JWT with the
  * Auth server), never `getSession()`. Call these inside every protected Server
  * Component / Server Action - never rely on middleware alone.
+ *
+ * `getUser` itself lives in `./user` and is request-cached, so calling a guard in
+ * a layout AND again in the page it wraps costs one Auth round trip, not two.
+ * Re-exported here so existing call sites are unchanged.
  */
 
-export async function getUser(): Promise<User | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-}
+export { getUser };
 
 /** Require a logged-in user; otherwise redirect to login preserving destination. */
 export async function requireUser(nextPath?: string): Promise<User> {
@@ -90,18 +90,25 @@ export async function requireAdmin(): Promise<User> {
  * claim but the client SDK exposes it here). `currentLevel` is this session's
  * level; `nextLevel` is the highest level the user *could* reach (aal2 iff they
  * have a verified factor).
+ *
+ * Request-cached for the same reason as `getUser`: an admin page runs
+ * `requireAdmin()` in `app/admin/layout.tsx` and `requireAdminMfa()` in the page
+ * itself, so without this the AAL round trip was paid twice per render (and the
+ * enrol/challenge screens paid it again).
  */
-export async function sessionAal(): Promise<{
-  currentLevel: string | null;
-  nextLevel: string | null;
-}> {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return {
-    currentLevel: data?.currentLevel ?? null,
-    nextLevel: data?.nextLevel ?? null,
-  };
-}
+export const sessionAal = cache(
+  async (): Promise<{
+    currentLevel: string | null;
+    nextLevel: string | null;
+  }> => {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return {
+      currentLevel: data?.currentLevel ?? null,
+      nextLevel: data?.nextLevel ?? null,
+    };
+  },
+);
 
 /**
  * Require an admin who has completed a second factor this session (aal2). This

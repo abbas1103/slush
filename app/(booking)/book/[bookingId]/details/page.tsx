@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getBookingContext } from "@/lib/db/queries";
 import { computePricing } from "@/lib/pricing/compute";
 import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth/user";
 import { decryptPII } from "@/lib/crypto/pii";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { DetailsForm, type DetailsInitial } from "@/components/booking/DetailsForm";
@@ -15,31 +16,29 @@ export default async function DetailsPage({
   const { bookingId } = await params;
   const supabase = await createClient();
 
-  // Wave 1 - the context, the session user and the booking's insurance_details
-  // (not part of BookingContext) are independent of each other.
-  const [ctx, userRes, bookingRow] = await Promise.all([
+  // The layout already required a verified user; re-check here rather than assume
+  // it (CLAUDE.md: never rely on the layer above alone). Because `getUser` is
+  // request-cached, that re-check is free - which is what lets the profile reads
+  // below join this wave instead of waiting for a second one.
+  const user = await getUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/book/${bookingId}/details`)}`);
+
+  // One wave. The context, the booking's insurance_details (not part of
+  // BookingContext) and the two user-keyed rows are all independent, so they cost
+  // one round trip between them rather than the two serial waves this used to be.
+  const [ctx, bookingRow, profileRes, emergencyRes] = await Promise.all([
     getBookingContext(bookingId),
-    supabase.auth.getUser(),
     supabase
       .from("bookings")
       .select("insurance_details")
       .eq("id", bookingId)
       .maybeSingle(),
+    supabase.from("users").select("*").eq("id", user.id).maybeSingle(),
+    supabase.from("emergency_contacts").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
   if (!ctx) notFound();
   if (ctx.booking.status !== "pending") redirect("/");
   if (bookingRow.error) throw new Error(bookingRow.error.message);
-
-  // The layout already required a verified user; re-check here rather than
-  // assume it (CLAUDE.md: never rely on the layer above alone).
-  const user = userRes.data.user;
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/book/${bookingId}/details`)}`);
-
-  // Wave 2 - both keyed on the user we just resolved.
-  const [profileRes, emergencyRes] = await Promise.all([
-    supabase.from("users").select("*").eq("id", user.id).maybeSingle(),
-    supabase.from("emergency_contacts").select("*").eq("user_id", user.id).maybeSingle(),
-  ]);
   if (profileRes.error) throw new Error(profileRes.error.message);
   if (emergencyRes.error) throw new Error(emergencyRes.error.message);
   const profile = profileRes.data;

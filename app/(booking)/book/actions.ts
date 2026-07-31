@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser } from "@/lib/auth/user";
 import { computePricing, type Pricing } from "@/lib/pricing/compute";
 import { encryptPII } from "@/lib/crypto/pii";
 import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
@@ -15,11 +16,14 @@ import { TERMS_VERSION } from "@/lib/legal/version";
 
 type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
+/**
+ * Same verified-user check as `requireVerified`, but returning a result the
+ * caller can turn into a form error instead of redirecting. Reads through the
+ * request-cached `getUser` (lib/auth/user.ts), so an action invoked during a
+ * render that already resolved the user pays no second Auth round trip.
+ */
 async function getVerifiedUser(): Promise<AuthResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
   if (!user) return { ok: false, error: "Please log in to continue." };
   if (!user.email_confirmed_at) return { ok: false, error: "Please confirm your email first." };
   return { ok: true, user };

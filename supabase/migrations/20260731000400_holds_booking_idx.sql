@@ -1,0 +1,26 @@
+-- ─────────────────────────────────────────────────────────────────────────
+--  Index the holds lookup the payment page makes.
+-- ─────────────────────────────────────────────────────────────────────────
+--
+-- app/(booking)/book/[bookingId]/payment/page.tsx reads
+--
+--   select is_waitlist from holds
+--    where booking_id = $1 and status = 'active'
+--    order by created_at desc limit 1
+--
+-- to decide whether the student is paying for a place or a waiting-list spot.
+-- Both existing indexes on this table lead on trip_id -
+--
+--   holds_one_active_per_user_trip  on holds(trip_id, user_id) where status = 'active'
+--   holds_trip_status_expiry_idx    on holds(trip_id, status, expires_at)
+--
+-- so neither can serve a booking_id predicate and the read was a sequential scan.
+-- holds gains a row per booking attempt and is never pruned (expiry is a status
+-- change, not a delete), so every abandoned checkout made the screen immediately
+-- before payment slower. That is the wrong direction for the one page that has to
+-- feel instant.
+--
+-- created_at is included so the order-by/limit-1 is served from the index too,
+-- rather than sorting the matched rows.
+create index if not exists holds_booking_idx
+  on public.holds (booking_id, created_at desc);
