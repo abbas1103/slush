@@ -1,7 +1,12 @@
 import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 export default defineConfig({
+  // Only needed to compile JSX in component tests (*.test.tsx). The React plugin
+  // does not change how the app is built - Next/Turbopack owns that - and the
+  // node-environment tests below are unaffected by it.
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
@@ -10,8 +15,12 @@ export default defineConfig({
     },
   },
   test: {
+    // Node stays the DEFAULT: the 16 existing suites are pure logic and do not
+    // want a DOM. Component tests opt in per file with a
+    // `// @vitest-environment jsdom` docblock, so adding one cannot slow down or
+    // change the behaviour of the rest.
     environment: "node",
-    include: ["**/*.test.ts"],
+    include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules/**", ".next/**"],
     env: {
       // lib/stripe/server.ts fails closed on a missing key at module load, so a
