@@ -4,7 +4,8 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveDetails } from "@/app/(booking)/book/actions";
-import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
+import type { DetailsInput } from "@/lib/validation/details";
+import { validateDetails } from "@/lib/validation/details-client";
 import type { Pricing } from "@/lib/pricing/compute";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -101,12 +102,17 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
     declTerms,
   };
 
-  // Checked in the browser against the SAME schema the server uses, so a
-  // student sees every problem at once, on the control that caused it, instead
-  // of one anonymous message per round trip (audit #79). Only once they've tried
-  // to submit, so the form isn't red before they've started, and re-checked on
-  // every keystroke after that so a message clears as soon as it's fixed.
-  const parsed = detailsSchema.safeParse(input);
+  // Checked in the browser so a student sees every problem at once, on the
+  // control that caused it, instead of one anonymous message per round trip
+  // (audit #79). Only once they've tried to submit, so the form isn't red before
+  // they've started, and re-checked on every keystroke after that so a message
+  // clears as soon as it's fixed.
+  //
+  // A hand-rolled mirror of detailsSchema, NOT the schema itself: importing zod
+  // here put its whole 66 KB gzipped runtime into the bundle for this page. The
+  // server still validates with the real schema in saveDetails, which is the only
+  // check that gates a write - see lib/validation/details-client.ts.
+  const parsed = validateDetails(input);
   const fieldErrors: Record<string, string> = {};
   if (attempted && !parsed.success) {
     for (const issue of parsed.error.issues) {

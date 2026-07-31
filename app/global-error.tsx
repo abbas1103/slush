@@ -1,12 +1,13 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { reportClientError } from "@/lib/observability/report";
 
 /**
  * Root error boundary for uncaught client-side React render errors (which
- * onRequestError does not cover). Reports to Sentry (no-op if not configured)
- * and shows a minimal fallback. Must render its own <html>/<body>.
+ * onRequestError does not cover). Reports via the same-origin beacon, which hands
+ * off to the server Sentry SDK (inert if no DSN), and shows a minimal fallback.
+ * Must render its own <html>/<body>.
  */
 export default function GlobalError({
   error,
@@ -14,7 +15,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    reportClientError(error);
   }, [error]);
 
   return (

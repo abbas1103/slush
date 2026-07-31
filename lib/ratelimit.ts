@@ -21,6 +21,13 @@ const LIMITS = {
   tripCode: { limit: 10, window: "1 minute" },
   /** Denial-of-wallet: PaymentIntent creation, and scanner check-ins. */
   payment: { limit: 20, window: "1 minute" },
+  /**
+   * Client error reports (/api/client-error). Unauthenticated by necessity - a
+   * boundary can fire before or instead of a session - so it needs a cap: without
+   * one it is an open pipe into our Sentry quota. A real user hits a handful of
+   * boundaries a minute at worst; a render loop hits thousands.
+   */
+  clientError: { limit: 10, window: "1 minute" },
 } as const;
 
 export type RateLimitKind = keyof typeof LIMITS;

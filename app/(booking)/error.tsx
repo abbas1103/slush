@@ -2,13 +2,15 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
+import { reportClientError } from "@/lib/observability/report";
 import { Button, buttonVariants } from "@/components/ui/Button";
 
 /**
  * Error boundary for the booking area, so a failed query mid-flow renders inside
  * the SLUSH chrome with a retry instead of falling through to global-error.tsx's
- * bare fallback. Reports to Sentry (no-op if not configured).
+ * bare fallback. Reports via the same-origin beacon, which hands off to the server
+ * Sentry SDK (inert if no DSN) - see lib/observability/report.ts for why the
+ * browser SDK is not used.
  *
  * The copy deliberately makes no claim about whether a payment went through -
  * this boundary can fire on the confirmation screen, after the charge.
@@ -21,7 +23,7 @@ export default function BookingError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    reportClientError(error);
   }, [error]);
 
   return (

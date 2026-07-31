@@ -162,9 +162,14 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on everything except Next.js internals, the favicon, and the Sentry
-    // tunnel route (`/monitoring`) - under Turbopack, middleware intercepting the
-    // tunnel breaks client-side event recording, so it must be excluded here.
+    // Run on everything except Next.js internals, the favicon, and the client
+    // error beacon (`/api/client-error`). The beacon is excluded because it needs
+    // no session: it is posted by an error boundary, so making it wait on a
+    // Supabase getUser() round trip (and mint a Set-Cookie) would tax the one
+    // request that fires when things are already going wrong. The route trusts
+    // nothing in the body and rate-limits by IP, so it is not relying on this.
+    // (This replaced `/monitoring`, the old Sentry browser tunnel, which went away
+    // with the browser SDK - see next.config.ts.)
     // Excluded by path only: a trailing `.*\.(svg|png|jpg|jpeg|gif|webp)$` used to
     // be in this lookahead, which also skipped app routes that merely END in one
     // of those extensions (/trip/foo.png, which /trip/[code] serves happily), so
@@ -177,6 +182,6 @@ export const config = {
     // matching them would mean a Supabase getUser() round trip (and a Set-Cookie
     // carrying rotated auth cookies) on every favicon revalidation. Named paths,
     // not a suffix pattern - that is what audit #120 was about.
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|monitoring).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|api/client-error).*)',
   ],
 }

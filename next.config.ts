@@ -41,10 +41,20 @@ const nextConfig: NextConfig = {
 /**
  * Wrap with Sentry ONLY when a DSN is configured. With no Sentry env (CI/local
  * placeholder builds) the plugin is never invoked → zero warnings, clean build.
- * `tunnelRoute` routes browser events same-origin (covered by the CSP's
- * `connect-src 'self'`, so no CSP change) and dodges ad-blockers - proxy.ts
- * excludes `/monitoring` from its matcher so the tunnel isn't intercepted.
  * Source-map upload is gated on SENTRY_AUTH_TOKEN so tokenless builds pass.
+ *
+ * SERVER-SIDE ONLY. The browser SDK is gone: it was ~150 KB gzipped in the chunk
+ * every route loaded eagerly, including content pages with no interactivity. It
+ * could not be slimmed, only removed - `bundleSizeOptimizations` is a no-op here,
+ * because the `__SENTRY_TRACING__`/`__SENTRY_DEBUG__` defines that drive its
+ * tree-shaking are injected only by @sentry/nextjs's WEBPACK path and this project
+ * builds with Turbopack. Verified by building with those flags on, off and absent:
+ * byte-identical output, tracing symbols present every time. So the flags are not
+ * set here, and `tunnelRoute`/`widenClientFileUpload` are gone too - there are no
+ * browser events left to tunnel and no client bundles left to map.
+ *
+ * Client errors now arrive via `/api/client-error` (see lib/observability/report.ts)
+ * and are reported through the server SDK instead.
  */
 const sentryEnabled = !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN);
 
@@ -53,15 +63,7 @@ export default sentryEnabled
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       authToken: process.env.SENTRY_AUTH_TOKEN,
-      tunnelRoute: "/monitoring",
-      // The SDK sits in the chunk every route loads eagerly, including content
-      // pages with no interactivity, so tree-shake its own debug/logging code
-      // out of the browser bundle. Session Replay is deliberately off (it would
-      // record passport/DOB/card fields), so the excludeReplay* flags would be
-      // no-ops here and are left out.
-      bundleSizeOptimizations: { excludeDebugStatements: true },
       sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
-      widenClientFileUpload: true,
       telemetry: false,
       silent: !process.env.CI,
     })
