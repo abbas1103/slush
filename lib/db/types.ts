@@ -697,6 +697,26 @@ export type Database = {
           },
         ]
       }
+      // service_role only (RLS on, no policies). Written solely by
+      // rate_limit_check; nothing in the app queries it directly.
+      rate_limit_hits: {
+        Row: {
+          bucket: string
+          hit_at: string
+          id: number
+        }
+        Insert: {
+          bucket: string
+          hit_at?: string
+          id?: number
+        }
+        Update: {
+          bucket?: string
+          hit_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
       stripe_events: {
         Row: {
           id: string
@@ -913,6 +933,12 @@ export type Database = {
           p_kind: string
         }
         Returns: Database["public"]["Enums"]["booking_status"]
+      }
+      // service_role only. Sliding-window limiter; true = allowed. Verified
+      // identical to `supabase gen types` output against the live schema.
+      rate_limit_check: {
+        Args: { p_bucket: string; p_limit: number; p_window: string }
+        Returns: boolean
       }
       redeem_trip_code: { Args: { p_code: string }; Returns: string }
       // 'released' | 'payment_in_flight' | 'not_found' - refuses to cancel a

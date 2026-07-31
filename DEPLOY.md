@@ -87,7 +87,7 @@ its own, and PITR is a paid add-on that is **off by default**.
   - `PII_ENCRYPTION_KEY` (32-byte base64 - **reuse the exact key used to encrypt existing rows;
     losing/rotating it makes passport/DOB/phone/emergency unreadable**)
   - `TURNSTILE_SECRET_KEY`
-  - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (activates rate limiting)
+  - (No rate-limiting vars: the limiter runs in Postgres, so it is live wherever the database is.)
   - `CRON_SECRET` (random; Vercel Cron auto-sends it as `Authorization: Bearer`)
   - `SENTRY_DSN`, and build-time `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN`
   - `CRM_PROVIDER` - leave blank until a CRM is chosen. The drain then stays inert and leaves every
