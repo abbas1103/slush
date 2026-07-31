@@ -115,10 +115,19 @@ its own, and PITR is a paid add-on that is **off by default**.
 - [ ] For source-map upload set `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` (build-time).
       Without the auth token the build still succeeds (upload skipped).
 
-## 5. Cron (CRM outbox drain)
+## 5. Cron (CRM outbox drain + abandoned-intent sweep)
 
 - [ ] `vercel.json` schedules `/api/cron/crm` **once a day at 03:00**, because **sub-daily crons need
       Vercel Pro** (Hobby = once daily). On Pro, change it to `*/15 * * * *`.
+- [ ] That one route runs **two** jobs, via `Promise.allSettled` so either can fail without stopping
+      the other, and returns **5xx if either throws**. Sharing a route avoids taking a second cron
+      slot, and neither job is urgent.
+- [ ] The second job (`sweepAbandonedIntents`) cancels PaymentIntents for bookings abandoned at the
+      payment step and clears `payment_intent_id`, which lets `expire_stale_holds` cancel the booking
+      on its next pass. Without it those rows are unresolvable: the pg_cron sweep skips anything with
+      an intent, `release_hold` refuses with `payment_in_flight`, and nothing else cancels an intent
+      unless the student returns. Capacity was never at risk (the hold still expires); the row was.
+      It only ever touches intents in `CANCELABLE_PI`, and only 60 minutes after the hold lapsed.
 - [ ] Throughput: one run drains up to **500 events** within an ~8s wall-clock budget, so a sold-out
       300-place trip clears in a single night. Rows are taken fewest-attempts-first, so a row that
       keeps failing sinks behind fresh events instead of blocking the queue. Anything left over stays

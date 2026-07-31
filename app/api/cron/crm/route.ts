@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { processCrmOutbox } from "@/lib/crm/process";
+import { sweepAbandonedIntents } from "@/lib/booking/abandoned";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +14,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * CRM outbox drain. Protected by CRON_SECRET (Vercel Cron sends it as a Bearer
- * token). Configure the schedule in vercel.json at deploy.
+ * Nightly maintenance. Protected by CRON_SECRET (Vercel Cron sends it as a
+ * Bearer token). Configure the schedule in vercel.json at deploy.
+ *
+ * Two jobs share this route rather than taking a second cron slot, because
+ * Vercel caps how many a plan may schedule and neither job is urgent: the CRM
+ * outbox is eventually-consistent by design, and an abandoned intent has already
+ * released its place via the 30-minute hold, so clearing it a few hours later
+ * costs nothing. They run independently - a CRM failure must not stop the sweep.
  */
 async function handle(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -22,8 +29,17 @@ async function handle(request: Request) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
-  const result = await processCrmOutbox();
-  return NextResponse.json(result);
+
+  const [crm, abandoned] = await Promise.allSettled([processCrmOutbox(), sweepAbandonedIntents()]);
+
+  const body = {
+    crm: crm.status === "fulfilled" ? crm.value : { error: String(crm.reason).slice(0, 200) },
+    abandoned:
+      abandoned.status === "fulfilled" ? abandoned.value : { error: String(abandoned.reason).slice(0, 200) },
+  };
+  // 5xx so a silent failure shows red in the Vercel cron log and reaches Sentry.
+  const failed = crm.status === "rejected" || abandoned.status === "rejected";
+  return NextResponse.json(body, { status: failed ? 500 : 200 });
 }
 
 export const GET = handle;

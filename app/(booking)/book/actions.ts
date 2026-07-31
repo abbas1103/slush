@@ -9,6 +9,7 @@ import { computePricing, type Pricing } from "@/lib/pricing/compute";
 import { encryptPII } from "@/lib/crypto/pii";
 import { detailsSchema, type DetailsInput } from "@/lib/validation/details";
 import { stripe } from "@/lib/stripe/server";
+import { CANCELABLE_PI } from "@/lib/stripe/cancelable";
 import { rateLimit } from "@/lib/ratelimit";
 import { TERMS_VERSION } from "@/lib/legal/version";
 
@@ -45,11 +46,7 @@ function reportFailure(scope: string, cause: unknown): void {
 
 // ── The single live PaymentIntent per booking (audit #9) ──────────────────────
 // Statuses where the recorded intent can still be safely cancelled/replaced.
-const CANCELABLE_PI = new Set([
-  "requires_payment_method",
-  "requires_confirmation",
-  "requires_action",
-]);
+// Shared with the abandoned-intent sweep so the two can never drift apart.
 // Statuses where money is already moving or settled - must NEVER mint a second
 // chargeable intent for the booking (would double-charge; audit #9). 'succeeded'
 // is handled ahead of this set: once the ledger has the payment the slot is free.

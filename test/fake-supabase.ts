@@ -31,7 +31,7 @@ export interface FakeResult {
 export type FakeOperation = "select" | "insert" | "update" | "delete";
 
 export interface FakeFilter {
-  kind: "eq" | "is" | "in" | "contains";
+  kind: "eq" | "is" | "in" | "contains" | "not";
   column: string;
   value: unknown;
 }
@@ -55,6 +55,8 @@ export interface FakeQuery extends PromiseLike<FakeResult> {
   delete(): FakeQuery;
   eq(column: string, value: unknown): FakeQuery;
   is(column: string, value: unknown): FakeQuery;
+  /** Models `.not(column, "is", null)`; the operator argument is ignored. */
+  not(column: string, operator: string, value: unknown): FakeQuery;
   in(column: string, values: unknown[]): FakeQuery;
   contains(column: string, value: unknown): FakeQuery;
   order(column: string, options?: { ascending?: boolean }): FakeQuery;
@@ -120,6 +122,10 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
           return Array.isArray(filter.value) && filter.value.includes(actual);
         case "contains":
           return subsetOf(actual, filter.value);
+        // Only the `.not(col, "is", null)` form is modelled - the one shape the
+        // app actually uses. Anything else would be a fake that lies.
+        case "not":
+          return actual !== filter.value;
         default:
           return actual === filter.value;
       }
@@ -196,6 +202,10 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
       },
       is(column: string, value: unknown) {
         filters.push({ kind: "is", column, value });
+        return query;
+      },
+      not(column: string, _operator: string, value: unknown) {
+        filters.push({ kind: "not", column, value });
         return query;
       },
       in(column: string, values: unknown[]) {
