@@ -42,10 +42,12 @@ interface Props {
   email: string;
   basePricing: Pricing; // excludes insurance cover
   coverPrice: number;
+  coverName: string; // the cover extra's DB name (admin-editable), not a hardcoded label
+  coverDescription: string; // the cover extra's DB description
   initial: DetailsInitial;
 }
 
-export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing, coverPrice, initial }: Props) {
+export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing, coverPrice, coverName, coverDescription, initial }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
@@ -65,7 +67,7 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
   const pricing: Pricing = buyInsurance
     ? {
         ...basePricing,
-        lineItems: [...basePricing.lineItems, { label: "Winter sports cover", amount: coverPrice }],
+        lineItems: [...basePricing.lineItems, { label: coverName, amount: coverPrice }],
         tripCost: basePricing.tripCost + coverPrice,
         balanceAfterDeposit: basePricing.balanceAfterDeposit + coverPrice,
         payInFullToday: basePricing.payInFullToday + coverPrice,
@@ -337,7 +339,7 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
 
         <Card>
           <h3>Insurance</h3>
-          <p className="mt-1 text-[13px] text-soft">Winter sports cover is required for this trip.</p>
+          <p className="mt-1 text-[13px] text-soft">{coverName} is required for this trip.</p>
           <div className="mt-3 flex flex-col gap-2.5">
             <OptionRow
               title="I have my own winter sports insurance"
@@ -376,8 +378,8 @@ export function DetailsForm({ bookingId, tripName, tripMeta, email, basePricing,
               </div>
             )}
             <OptionRow
-              title={<>Add winter sports cover - <Money pence={coverPrice} stripZeros /></>}
-              desc="Medical, piste closure, kit & cancellation."
+              title={<>Add {coverName} - <Money pence={coverPrice} stripZeros /></>}
+              desc={coverDescription}
               selected={f.insuranceChoice === "bought"}
               onClick={() => setF((p) => ({ ...p, insuranceChoice: "bought" }))}
             />

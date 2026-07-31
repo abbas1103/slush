@@ -47,6 +47,9 @@ export default async function DetailsPage({
 
   const coverExtra = ctx.extras.find((e) => e.type === "other") ?? null;
   const coverPrice = coverExtra?.price ?? 0;
+  // Label + blurb come from the (admin-editable) extra row, not hardcoded copy.
+  const coverName = coverExtra?.name ?? "Winter sports cover";
+  const coverDescription = coverExtra?.description ?? "Medical, piste closure, kit & cancellation.";
 
   // Base pricing EXCLUDES the insurance cover, so the form can add/remove it live.
   const nonCoverSelected = ctx.selected.filter((s) => s.extra_id !== coverExtra?.id);
@@ -101,6 +104,8 @@ export default async function DetailsPage({
         email={user.email ?? ""}
         basePricing={basePricing}
         coverPrice={coverPrice}
+        coverName={coverName}
+        coverDescription={coverDescription}
         initial={initial}
       />
     </>

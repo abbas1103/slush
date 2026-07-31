@@ -188,7 +188,7 @@ export function ExtrasFlow(props: Props) {
         {coach && (
           <Card className="mt-5">
             <h3>Getting there</h3>
-            <p className="mb-3 mt-1 text-[13px] text-soft">Optional coach from Birmingham to resort.</p>
+            <p className="mb-3 mt-1 text-[13px] text-soft">Optional return coach to resort.</p>
             <AddRow
               icon="🚌"
               title={coach.name}

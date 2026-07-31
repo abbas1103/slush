@@ -67,7 +67,9 @@ export function deriveTickets(
     {
       key: "lift",
       category: "Lift pass",
-      title: "6-day lift pass",
+      // Trip-agnostic: pass length varies per trip and is not threaded in here,
+      // so don't bake a duration into the label (the category already says "Lift pass").
+      title: "Lift pass",
       ticketId: `TKT-LP-${suffix}`,
       maxScans: 1,
     },
