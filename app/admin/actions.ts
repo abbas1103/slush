@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { User } from "@supabase/supabase-js";
 import { requireAdminMfa } from "@/lib/auth/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyWaitlistPromoted, notifyDamageDepositRefunded } from "@/lib/email/notify";
 import { stripe } from "@/lib/stripe/server";
 import { formatPence } from "@/lib/utils/money";
 import type { Json } from "@/lib/db/types";
@@ -332,6 +333,10 @@ export async function convertWaitlist(bookingId: string, tripId: string): Promis
   if (error) return { ok: false, error: error.message };
   const logged = await audit(user, "waitlist_convert", "booking", bookingId, {});
   if (!logged.ok) return logged;
+  // The student has no other way to learn a place opened up: the status flips in
+  // the database and nothing else tells them. Deduped on the booking id, so a
+  // second admin click does not send a second email.
+  await notifyWaitlistPromoted(bookingId);
   revalidatePath(`/admin/trips/${tripId}/bookings`);
   return { ok: true };
 }
@@ -469,6 +474,9 @@ export async function refundDamage(bookingId: string, tripId: string, withheldAm
   }
   const logged = await audit(user, "damage_deposit_refund", "booking", bookingId, { amount: refundAmount, withheld_amount: withheld });
   if (!logged.ok) return logged;
+  // Money going back to a student's card weeks after the trip is unexplained
+  // unless we say so; a withholding especially needs a paper trail.
+  await notifyDamageDepositRefunded(bookingId, refundAmount, withheld);
   revalidatePath(`/admin/trips/${tripId}/bookings`);
   return { ok: true };
 }

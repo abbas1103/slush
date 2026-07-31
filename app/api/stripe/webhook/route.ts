@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe/server";
 import { stripeWebhookSecret } from "@/lib/stripe/webhook-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyPaymentSucceeded } from "@/lib/email/notify";
 
 // Stripe SDK + raw-body verification require the Node runtime.
 export const runtime = "nodejs";
@@ -177,6 +178,12 @@ export async function POST(request: Request) {
             p_amount_total: pi.amount,
           });
           if (error) throw new Error(error.message);
+          // After the ledger, never before, and deliberately not awaited into the
+          // failure path: the payment is recorded either way, and a mail outage
+          // must not 5xx a delivery into a retry that re-drives finalisation.
+          // Deduped on event.id, so Stripe's three-day retry window cannot
+          // produce a second receipt for one payment.
+          await notifyPaymentSucceeded(bookingId, kind, pi.amount, event.id);
         } else {
           // Charged with no booking metadata: nothing can be finalized, so the
           // student is out of pocket with no place. Must not ack silently.

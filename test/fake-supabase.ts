@@ -28,10 +28,10 @@ export interface FakeResult {
   error: FakeError | null;
 }
 
-export type FakeOperation = "select" | "insert" | "update" | "delete";
+export type FakeOperation = "select" | "insert" | "update" | "delete" | "upsert";
 
 export interface FakeFilter {
-  kind: "eq" | "is" | "in" | "contains" | "not";
+  kind: "eq" | "is" | "in" | "contains" | "not" | "lt";
   column: string;
   value: unknown;
 }
@@ -51,12 +51,15 @@ export interface FakeRpcCall {
 export interface FakeQuery extends PromiseLike<FakeResult> {
   select(columns?: string): FakeQuery;
   insert(value: unknown): FakeQuery;
+  /** Honours onConflict + ignoreDuplicates for real, so dedupe can be tested. */
+  upsert(value: unknown, options?: { onConflict?: string; ignoreDuplicates?: boolean }): FakeQuery;
   update(value: unknown): FakeQuery;
   delete(): FakeQuery;
   eq(column: string, value: unknown): FakeQuery;
   is(column: string, value: unknown): FakeQuery;
   /** Models `.not(column, "is", null)`; the operator argument is ignored. */
   not(column: string, operator: string, value: unknown): FakeQuery;
+  lt(column: string, value: number): FakeQuery;
   in(column: string, values: unknown[]): FakeQuery;
   contains(column: string, value: unknown): FakeQuery;
   order(column: string, options?: { ascending?: boolean }): FakeQuery;
@@ -126,6 +129,8 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
         // app actually uses. Anything else would be a fake that lies.
         case "not":
           return actual !== filter.value;
+        case "lt":
+          return typeof actual === "number" && typeof filter.value === "number" && actual < filter.value;
         default:
           return actual === filter.value;
       }
@@ -138,6 +143,7 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
     let payload: unknown;
     let limitTo: number | null = null;
     let orderBy: { column: string; ascending: boolean } | null = null;
+    let upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {};
 
     function selected(): FakeRow[] {
       let out = (tables[table] ?? []).filter((row) => matches(row, filters));
@@ -158,6 +164,26 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
         const incoming = (Array.isArray(payload) ? payload : [payload]) as FakeRow[];
         const inserted = incoming.map((row) => ({ ...row }));
         tables[table] = [...(tables[table] ?? []), ...inserted];
+        return { data: inserted, error: null };
+      }
+      if (operation === "upsert") {
+        const incoming = (Array.isArray(payload) ? payload : [payload]) as FakeRow[];
+        const keys = (upsertOpts.onConflict ?? "id").split(",").map((k) => k.trim());
+        const existing = tables[table] ?? [];
+        const inserted: FakeRow[] = [];
+        for (const row of incoming) {
+          const clash = existing.find((r) => keys.every((k) => r[k] === row[k]));
+          if (clash) {
+            // PostgREST returns only the rows it actually inserted, which is how
+            // the caller distinguishes "queued" from "already queued".
+            if (!upsertOpts.ignoreDuplicates) Object.assign(clash, row);
+            continue;
+          }
+          const copy = { ...row };
+          existing.push(copy);
+          inserted.push(copy);
+        }
+        tables[table] = existing;
         return { data: inserted, error: null };
       }
       if (operation === "update") {
@@ -187,6 +213,12 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
         payload = value;
         return query;
       },
+      upsert(value: unknown, options?: { onConflict?: string; ignoreDuplicates?: boolean }) {
+        operation = "upsert";
+        payload = value;
+        upsertOpts = options ?? {};
+        return query;
+      },
       update(value: unknown) {
         operation = "update";
         payload = value;
@@ -206,6 +238,10 @@ export function createFakeClient(options: FakeClientOptions = {}): FakeClient {
       },
       not(column: string, _operator: string, value: unknown) {
         filters.push({ kind: "not", column, value });
+        return query;
+      },
+      lt(column: string, value: number) {
+        filters.push({ kind: "lt", column, value });
         return query;
       },
       in(column: string, values: unknown[]) {

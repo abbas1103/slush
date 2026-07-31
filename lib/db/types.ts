@@ -697,6 +697,48 @@ export type Database = {
           },
         ]
       }
+      // Transactional email queue. dedupe_key is UNIQUE: a Stripe webhook retry
+      // must never enqueue a second copy of a receipt. Hand-added alongside
+      // migration 20260731000200.
+      email_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          last_error: string | null
+          payload: Json
+          sent_at: string | null
+          status: Database["public"]["Enums"]["email_outbox_status"]
+          template: string
+          to_email: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_outbox_status"]
+          template: string
+          to_email: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_outbox_status"]
+          template?: string
+          to_email?: string
+        }
+        Relationships: []
+      }
       // service_role only (RLS on, no policies). Written solely by
       // rate_limit_check; nothing in the app queries it directly.
       rate_limit_hits: {
@@ -974,6 +1016,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
       crm_outbox_status: "pending" | "sent" | "failed"
+      email_outbox_status: "pending" | "sent" | "failed"
       damage_status: "held" | "refunded" | "withheld"
       extra_type: "transport" | "equipment" | "lessons" | "event" | "other"
       hold_status: "active" | "consumed" | "released" | "expired"

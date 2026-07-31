@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { processCrmOutbox } from "@/lib/crm/process";
 import { sweepAbandonedIntents } from "@/lib/booking/abandoned";
+import { drainEmailOutbox } from "@/lib/email/outbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,16 +31,23 @@ async function handle(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const [crm, abandoned] = await Promise.allSettled([processCrmOutbox(), sweepAbandonedIntents()]);
+  const [crm, abandoned, email] = await Promise.allSettled([
+    processCrmOutbox(),
+    sweepAbandonedIntents(),
+    // Retry net only: mail is normally sent inline at enqueue time. This catches
+    // anything that failed then, or was queued while the adapter was inert.
+    drainEmailOutbox(),
+  ]);
 
-  const body = {
-    crm: crm.status === "fulfilled" ? crm.value : { error: String(crm.reason).slice(0, 200) },
-    abandoned:
-      abandoned.status === "fulfilled" ? abandoned.value : { error: String(abandoned.reason).slice(0, 200) },
-  };
+  const value = (r: PromiseSettledResult<unknown>) =>
+    r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) };
+
   // 5xx so a silent failure shows red in the Vercel cron log and reaches Sentry.
-  const failed = crm.status === "rejected" || abandoned.status === "rejected";
-  return NextResponse.json(body, { status: failed ? 500 : 200 });
+  const failed = [crm, abandoned, email].some((r) => r.status === "rejected");
+  return NextResponse.json(
+    { crm: value(crm), abandoned: value(abandoned), email: value(email) },
+    { status: failed ? 500 : 200 },
+  );
 }
 
 export const GET = handle;
