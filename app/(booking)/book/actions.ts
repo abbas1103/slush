@@ -278,10 +278,18 @@ export interface ExtrasSelectionInput {
 // Strict boundary parse (audit #52): unknown keys rejected, ids must be uuids,
 // and the list is bounded. Duplicates are removed below so a repeated id can
 // never become a duplicate charged line item.
+//
+// z.guid() and NOT z.uuid(): zod v4's z.uuid() also enforces the RFC-9562
+// version/variant nibbles, which rejects perfectly valid `uuid` column values -
+// including every seeded catalogue id (30000000-0000-0000-0000-000000000001).
+// That made this parse fail for every selection, so no extra could be added at
+// all. z.guid() keeps the 8-4-4-4-12 shape check, which is exactly what Postgres
+// accepts; the ids are then checked against this trip's own catalogue below, so
+// the boundary is no weaker.
 const extrasSelectionSchema = z
   .object({
-    extraIds: z.array(z.uuid()).max(50),
-    tiers: z.record(z.uuid(), z.uuid()),
+    extraIds: z.array(z.guid()).max(50),
+    tiers: z.record(z.guid(), z.guid()),
   })
   .strict();
 
@@ -298,7 +306,10 @@ export async function updateExtras(
 
   const parsedSelection = extrasSelectionSchema.safeParse(selection);
   if (!parsedSelection.success) {
-    return { ok: false, error: "Please reselect your extras and try again." };
+    // Nothing the student can do by re-picking: this only fires if the browser
+    // sent a shape the server won't accept. Don't send them round a loop.
+    reportFailure("updateExtras.parse", parsedSelection.error);
+    return { ok: false, error: "Something went wrong applying your extras - please refresh and try again." };
   }
   const extraIds = [...new Set(parsedSelection.data.extraIds)];
   const tiers = parsedSelection.data.tiers;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +12,12 @@ import { buttonVariants } from "@/components/ui/Button";
 import { StatusPoller } from "@/components/booking/StatusPoller";
 import { PaymentReturn } from "@/components/booking/PaymentReturn";
 import { formatDate, formatDateRange } from "@/lib/utils/dates";
+
+export const metadata: Metadata = {
+  title: "Booking confirmed - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 export default async function ConfirmationPage({
   params,
@@ -214,6 +221,14 @@ export default async function ConfirmationPage({
             <Link href="/dashboard" className={buttonVariants({ variant: "dark", pill: true }) + " w-full"}>
               ⊞ Go to my dashboard
             </Link>
+            {/* Safe to offer even while the balance is outstanding: the tickets
+                page explains the unlock rule rather than 404ing. A waitlister has
+                no tickets to show, so only confirmed bookings get the link. */}
+            {!isWaitlist && (
+              <Link href="/tickets" className={buttonVariants({ variant: "out", pill: true }) + " w-full"}>
+                🎫 View my tickets
+              </Link>
+            )}
             <Card padding="sm">
               {isWaitlist ? (
                 <>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { authErrorCopy } from "@/lib/auth/error-copy";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
@@ -44,7 +45,7 @@ export function LoginForm({
     });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(authErrorCopy(error));
       // The token has been redeemed, so the next attempt needs a fresh one.
       turnstile.current?.reset();
       return;
@@ -69,7 +70,9 @@ export function LoginForm({
       )}
 
       {error && (
-        <div className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">{error}</div>
+        <div role="alert" className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">
+          {error}
+        </div>
       )}
 
       <Field label="Email address">

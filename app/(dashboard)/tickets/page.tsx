@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getMyBooking } from "@/lib/db/queries";
 import { deriveTickets, ticketQrDataUrl, ticketScanUrl } from "@/lib/tickets";
@@ -7,6 +8,12 @@ import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
 import { buttonVariants } from "@/components/ui/Button";
 import { formatDateRange } from "@/lib/utils/dates";
+
+export const metadata: Metadata = {
+  title: "My tickets - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 

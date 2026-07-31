@@ -12,11 +12,28 @@ interface Hold {
   expiresAt: string;
 }
 
-/** Trip-detail CTA: starts a booking (server hold) then opens the hold modal. */
-export function BookButton({ code, isFull }: { code: string; isFull: boolean }) {
+/**
+ * Trip-detail CTA: starts a booking (server hold) then opens the hold modal.
+ *
+ * `initialHold` is the student's existing live hold, read server-side. It seeds
+ * the state so a page refresh rebuilds the reservation panel instead of dropping
+ * it - previously the hold existed only in client state, so reloading lost the
+ * countdown and left no way to reach or release a place still being held.
+ * Rehydrating by calling startBooking() again would be wrong: its SQL releases
+ * the current hold and inserts a new one, silently restarting the 30 minutes.
+ */
+export function BookButton({
+  code,
+  isFull,
+  initialHold = null,
+}: {
+  code: string;
+  isFull: boolean;
+  initialHold?: Hold | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [hold, setHold] = useState<Hold | null>(null);
+  const [hold, setHold] = useState<Hold | null>(initialHold);
   const [error, setError] = useState<string | null>(null);
 
   function begin() {
@@ -42,8 +59,18 @@ export function BookButton({ code, isFull }: { code: string; isFull: boolean }) 
 
   async function release() {
     const current = hold;
+    if (!current) return;
+    setError(null);
+    // Optimistic, but only until the server answers: releaseHold refuses while a
+    // payment is still in flight, and closing the panel regardless told the
+    // student their place was released when it was not. Put it back and say so.
     setHold(null);
-    if (current) await releaseHold(current.bookingId);
+    const r = await releaseHold(current.bookingId);
+    if (!r.ok) {
+      setHold(current);
+      setError(r.error);
+      return;
+    }
     router.refresh();
   }
 

@@ -115,6 +115,51 @@ export async function getTripByCode(code: string): Promise<TripDetail | null> {
   return { trip, extras: normalised, isFull: !!isFull };
 }
 
+export interface LiveHold {
+  bookingId: string;
+  isWaitlist: boolean;
+  expiresAt: string;
+}
+
+/**
+ * The current user's live 30-minute hold on a trip, if they have one.
+ *
+ * The trip page needs this so the reservation panel survives a refresh: it used
+ * to live only in client state, so reloading dropped the countdown and left the
+ * student with no way to see or release a place they were still holding.
+ *
+ * `expires_at > now()` is load-bearing, not decorative: expiry is a lazy status
+ * change (pg_cron sweeps every minute, start_booking sweeps inline), so an
+ * 'active' row can already be past its expiry.
+ *
+ * At most one row can match - holds_one_active_per_user_trip is a partial unique
+ * index on (trip_id, user_id) where status = 'active' - so maybeSingle() is safe.
+ */
+export async function getMyLiveHold(tripId: string): Promise<LiveHold | null> {
+  const [supabase, user] = await Promise.all([createClient(), getUser()]);
+  if (!user) return null;
+
+  // Filter on user_id explicitly, as everywhere else here: the RLS policy is
+  // `user_id = auth.uid() OR is_admin_mfa()`, so an admin session would
+  // otherwise match every student's hold on this trip.
+  const { data, error } = await supabase
+    .from("holds")
+    .select("booking_id, is_waitlist, expires_at")
+    .eq("user_id", user.id)
+    .eq("trip_id", tripId)
+    .eq("status", "active")
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+  assertRead(error, "your reservation");
+
+  if (!data?.booking_id) return null;
+  return {
+    bookingId: data.booking_id,
+    isWaitlist: data.is_waitlist,
+    expiresAt: data.expires_at,
+  };
+}
+
 export interface SelectedExtra {
   extra_id: string;
   extra_tier_id: string | null;

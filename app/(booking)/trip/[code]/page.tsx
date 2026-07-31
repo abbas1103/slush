@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
-import { getTripByCode } from "@/lib/db/queries";
+import { getMyLiveHold, getTripByCode } from "@/lib/db/queries";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { TripTabs } from "@/components/booking/TripTabs";
 import { Card } from "@/components/ui/Card";
@@ -43,6 +43,10 @@ export default async function TripDetailPage({
   if (!detail) notFound();
 
   const { trip, extras, isFull } = detail;
+  // Read the student's own live hold so the reservation panel is rebuilt from
+  // server state on a fresh load. Needs trip.id, so it can't join the Promise.all
+  // inside getTripByCode.
+  const liveHold = await getMyLiveHold(trip.id);
   const events = extras.filter((e) => e.type === "event");
   const coach = extras.find((e) => e.type === "transport");
   const inclusions = Array.isArray(trip.base_inclusions)
@@ -82,7 +86,11 @@ export default async function TripDetailPage({
 
       <div className="mx-auto grid max-w-[1120px] gap-8 px-6 py-8 xl:grid-cols-[1fr_360px]">
         {/* ── Left column ─────────────────────────────────────────── */}
-        <div>
+        {/* min-w-0: this column holds the horizontally-scrollable TripTabs
+            strip, and a grid item defaults to min-width:auto - so without this
+            the strip's min-content width sets the track width and the page
+            overflows a phone viewport by ~166px. */}
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1>{trip.name}</h1>
             <Pill variant="black">Official trip</Pill>
@@ -201,7 +209,7 @@ export default async function TripDetailPage({
                   🔒 Secure your place with a <Money pence={trip.deposit_amount} stripZeros /> deposit
                 </div>
               )}
-              <BookButton code={tripCode} isFull={isFull} />
+              <BookButton code={tripCode} isFull={isFull} initialHold={liveHold} />
               <p className="mt-2 text-center text-[12px] text-soft">
                 One place per booking ·{" "}
                 <Link href="/terms#booking" className="underline hover:no-underline">

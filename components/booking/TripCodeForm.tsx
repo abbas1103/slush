@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Pill } from "@/components/ui/Pill";
 import { Money } from "@/components/ui/Money";
 import { Card } from "@/components/ui/Card";
+import { formatDateRange } from "@/lib/utils/dates";
 
 type Found = Extract<ResolveResult, { ok: true }>;
 
@@ -57,7 +58,11 @@ export function TripCodeForm() {
         </Button>
       </form>
 
-      {error && <p className="mt-4 text-[13px] text-err">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-4 text-[13px] text-err">
+          {error}
+        </p>
+      )}
 
       {result && (
         <Card padding="none" className="mt-6 overflow-hidden text-left">
@@ -69,6 +74,11 @@ export function TripCodeForm() {
               <div className="text-[16px] font-bold">{result.name}</div>
               <div className="text-[13px] text-soft">{result.organiser}</div>
               <div className="mt-1 text-[13px] text-soft">{result.resort}</div>
+              {/* Dates belong on the card: a student checking they've been given
+                  the right code shouldn't have to click through to see them. */}
+              <div className="mt-0.5 text-[13px] text-soft">
+                {formatDateRange(result.startDate, result.endDate)} · {result.nights} nights
+              </div>
               <div className="mt-2">
                 <Pill variant="success" dot>
                   Booking live

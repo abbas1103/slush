@@ -11,6 +11,9 @@ export type ResolveResult =
       organiser: string;
       resort: string;
       basePrice: number;
+      startDate: string;
+      endDate: string;
+      nights: number;
     }
   | { ok: false };
 
@@ -33,7 +36,7 @@ export async function resolveTripCode(rawCode: string): Promise<ResolveResult> {
 
   const { data: trip } = await supabase
     .from("trips")
-    .select("name, organiser, resort, base_price")
+    .select("name, organiser, resort, base_price, start_date, end_date, nights")
     .eq("id", tripId)
     .maybeSingle();
   if (!trip) return { ok: false };
@@ -45,5 +48,8 @@ export async function resolveTripCode(rawCode: string): Promise<ResolveResult> {
     organiser: trip.organiser,
     resort: trip.resort,
     basePrice: trip.base_price,
+    startDate: trip.start_date,
+    endDate: trip.end_date,
+    nights: trip.nights,
   };
 }

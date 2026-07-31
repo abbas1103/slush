@@ -9,6 +9,7 @@ import { createPaymentIntent, reconcilePayment } from "@/app/(booking)/book/acti
 import type { Pricing } from "@/lib/pricing/compute";
 import { Card } from "@/components/ui/Card";
 import { Button, buttonVariants } from "@/components/ui/Button";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { OptionRow } from "@/components/ui/OptionRow";
 import { Money } from "@/components/ui/Money";
 import { SummarySidebar } from "./SummarySidebar";
@@ -28,10 +29,15 @@ function CheckoutForm({ bookingId, amount, piId }: { bookingId: string; amount: 
   const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "submitting" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
+  // A final confirm at the point of payment. The declarations on the details step
+  // are still the mandatory legal consent (and are enforced server-side - you
+  // cannot reach this page without them); this is the last-look tick before money
+  // moves, so the amount and the terms are agreed on the same screen.
+  const [agreed, setAgreed] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!stripe || !elements || phase !== "idle") return;
+    if (!stripe || !elements || phase !== "idle" || !agreed) return;
     setPhase("submitting");
     setError(null);
     try {
@@ -89,8 +95,28 @@ function CheckoutForm({ bookingId, amount, piId }: { bookingId: string; amount: 
   return (
     <form onSubmit={onSubmit}>
       <PaymentElement />
-      {error && <p className="mt-3 text-[13px] text-err">{error}</p>}
-      <Button type="submit" className="mt-4 w-full" disabled={!stripe || phase === "submitting"}>
+      {error && (
+        <p role="alert" className="mt-3 text-[13px] text-err">
+          {error}
+        </p>
+      )}
+      <Checkbox
+        className="mt-4"
+        name="payConfirm"
+        checked={agreed}
+        onChange={(e) => setAgreed(e.target.checked)}
+      >
+        I confirm my details are correct and accept the{" "}
+        <Link href="/terms#booking" target="_blank" rel="noopener" className="underline">
+          Booking Conditions
+        </Link>
+        .
+      </Checkbox>
+      <Button
+        type="submit"
+        className="mt-4 w-full"
+        disabled={!stripe || phase === "submitting" || !agreed}
+      >
         {phase === "submitting" ? "Processing…" : (
           <>🔒 Pay <Money pence={amount} stripZeros /></>
         )}

@@ -25,7 +25,10 @@ class LogAdapter implements EmailAdapter {
   // permanently unsendable with no trace of what was lost.
   readonly delivers = false;
   async send(message: EmailMessage): Promise<void> {
-    console.log(`[email:log] would send "${message.subject}" to ${message.to}`);
+    // Subject only, never the address: an email address is personal data and the
+    // brief forbids PII in logs. The recipient is already on the outbox row if
+    // anyone needs to trace a specific send.
+    console.log(`[email:log] would send "${message.subject}"`);
   }
 }
 

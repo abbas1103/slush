@@ -120,7 +120,8 @@ export async function drainEmailOutbox(limit = DEFAULT_BATCH): Promise<DrainResu
         .from("email_outbox")
         .update({ status: "failed", attempts: row.attempts + 1, last_error: message.slice(0, 500) })
         .eq("id", row.id);
-      console.error(`[email] send failed (${row.template} -> ${row.to_email}):`, message);
+      // Identify the send by outbox row, not by recipient address: no PII in logs.
+      console.error(`[email] send failed (template ${row.template}, row ${row.id}):`, message);
     }
   }
 

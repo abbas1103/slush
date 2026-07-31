@@ -51,7 +51,7 @@ Note: middleware lives in `proxy.ts` (Next 16's renamed `middleware.ts`).
 
 - `holds` table is the server-side truth for the 30-min reservation; expiry is lazy + swept (pg_cron).
 - The confirmed-vs-waitlisted decision is made **atomically at payment success** in
-  `finalize_booking()` under `SELECT … FROM trips WHERE id FOR UPDATE` - never exceed capacity (never 301).
+  `record_payment_and_finalize()` under `SELECT … FROM trips WHERE id FOR UPDATE` - never exceed capacity (never 301).
 
 ## Build discipline
 

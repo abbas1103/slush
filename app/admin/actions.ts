@@ -260,7 +260,10 @@ export async function saveExtra(extraId: string | null, tripId: string, input: E
 
 export async function reorderExtras(tripId: string, orderedIds: string[]): Promise<Result> {
   const user = await requireAdminMfa();
-  const parsed = z.array(z.uuid()).max(500).safeParse(orderedIds);
+  // z.guid() not z.uuid(): see the note on extrasSelectionSchema in
+  // app/(booking)/book/actions.ts - z.uuid() rejects the seeded catalogue ids,
+  // which broke reordering for exactly the extras an admin is most likely to sort.
+  const parsed = z.array(z.guid()).max(500).safeParse(orderedIds);
   if (!parsed.success) return { ok: false, error: "Invalid extra order." };
   const admin = createAdminClient();
   // Every id must belong to this trip, so a stray one can't reorder another

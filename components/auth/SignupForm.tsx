@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/browser";
+import { authErrorCopy } from "@/lib/auth/error-copy";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
@@ -42,7 +43,7 @@ export function SignupForm({ next }: { next: string }) {
     });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(authErrorCopy(error));
       // A Turnstile token is single-use and Supabase has now redeemed it, so the
       // next attempt would replay a spent token and fail on the CAPTCHA rather
       // than on whatever the student actually got wrong. LoginForm already does
@@ -69,7 +70,9 @@ export function SignupForm({ next }: { next: string }) {
       </div>
 
       {error && (
-        <div className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">{error}</div>
+        <div role="alert" className="rounded-btn bg-errbg px-3 py-2 text-[13px] text-err">
+          {error}
+        </div>
       )}
 
       <Field label="Email address">

@@ -27,7 +27,11 @@ export function TripTabs() {
   }
 
   return (
-    <div className="flex gap-1 overflow-x-auto border-b border-line">
+    // min-w-0 so this strip can shrink below its content width on a phone. The
+    // five whitespace-nowrap buttons total ~532px; without it the strip's
+    // min-content width floors the parent grid track and pushes the whole trip
+    // page 556px wide inside a 390px viewport, cutting every line of copy off.
+    <div className="flex min-w-0 gap-1 overflow-x-auto border-b border-line">
       {TABS.map((t) => (
         <button
           key={t.id}

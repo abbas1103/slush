@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBookingContext } from "@/lib/db/queries";
 import { computePricing } from "@/lib/pricing/compute";
@@ -7,6 +8,12 @@ import { decryptPII } from "@/lib/crypto/pii";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { DetailsForm, type DetailsInitial } from "@/components/booking/DetailsForm";
 import { formatDateRange } from "@/lib/utils/dates";
+
+export const metadata: Metadata = {
+  title: "Your details - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 export default async function DetailsPage({
   params,

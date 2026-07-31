@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBookingContext } from "@/lib/db/queries";
 import { computePricing } from "@/lib/pricing/compute";
@@ -6,6 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { PaymentPanel } from "@/components/booking/PaymentPanel";
 import { formatDate, formatDateRange } from "@/lib/utils/dates";
+
+export const metadata: Metadata = {
+  title: "Payment - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 export default async function PaymentPage({
   params,

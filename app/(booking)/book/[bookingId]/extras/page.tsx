@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBookingContext } from "@/lib/db/queries";
 import { computePricing } from "@/lib/pricing/compute";
@@ -5,6 +6,12 @@ import { ExtrasFlow, type UiExtra } from "@/components/booking/ExtrasFlow";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { formatDateRange } from "@/lib/utils/dates";
 import type { ExtraWithTiers } from "@/lib/db/queries";
+
+export const metadata: Metadata = {
+  title: "Your extras - SLUSH",
+  // Signed-in surface: never index it, and don't follow links out of it.
+  robots: { index: false, follow: false },
+};
 
 const toUi = (e: ExtraWithTiers): UiExtra => ({
   id: e.id,

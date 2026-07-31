@@ -13,7 +13,7 @@ export default function TripLoading() {
       <p role="status" className="sr-only">
         Loading your trip…
       </p>
-      <div aria-hidden className="flex flex-col gap-4">
+      <div aria-hidden className="flex min-w-0 flex-col gap-4">
         <div className="h-9 w-3/4 animate-pulse rounded-btn bg-track" />
         <div className="h-5 w-1/2 animate-pulse rounded-btn bg-track" />
         <div className="h-48 animate-pulse rounded-card border border-line bg-surface" />
