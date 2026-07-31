@@ -956,6 +956,12 @@ export type Database = {
         Returns: undefined
       }
       booking_balance: { Args: { p_booking_id: string }; Returns: number }
+      // service_role only. Bookings whose balance falls due in exactly p_days.
+      // Hand-added alongside migration 20260731000300.
+      bookings_due_balance: {
+        Args: { p_days: number }
+        Returns: { booking_id: string; balance: number; due_date: string }[]
+      }
       booking_trip_paid: { Args: { p_booking_id: string }; Returns: number }
       compute_trip_cost: { Args: { p_booking_id: string }; Returns: number }
       expire_stale_holds: { Args: never; Returns: number }

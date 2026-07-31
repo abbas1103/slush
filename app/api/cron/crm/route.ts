@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { processCrmOutbox } from "@/lib/crm/process";
 import { sweepAbandonedIntents } from "@/lib/booking/abandoned";
 import { drainEmailOutbox } from "@/lib/email/outbox";
+import { sendBalanceReminders } from "@/lib/email/reminders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,11 +32,14 @@ async function handle(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Reminders first and awaited separately, so anything it queues is drained by
+  // the same run rather than waiting a day.
+  const reminders = await Promise.allSettled([sendBalanceReminders()]).then((r) => r[0]);
+
   const [crm, abandoned, email] = await Promise.allSettled([
     processCrmOutbox(),
     sweepAbandonedIntents(),
-    // Retry net only: mail is normally sent inline at enqueue time. This catches
-    // anything that failed then, or was queued while the adapter was inert.
+    // Retry net for inline sends, and the delivery path for the reminders above.
     drainEmailOutbox(),
   ]);
 
@@ -43,9 +47,9 @@ async function handle(request: Request) {
     r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) };
 
   // 5xx so a silent failure shows red in the Vercel cron log and reaches Sentry.
-  const failed = [crm, abandoned, email].some((r) => r.status === "rejected");
+  const failed = [crm, abandoned, email, reminders].some((r) => r.status === "rejected");
   return NextResponse.json(
-    { crm: value(crm), abandoned: value(abandoned), email: value(email) },
+    { crm: value(crm), abandoned: value(abandoned), reminders: value(reminders), email: value(email) },
     { status: failed ? 500 : 200 },
   );
 }
