@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getBookingContext } from "@/lib/db/queries";
 import { computePricing } from "@/lib/pricing/compute";
+import { createPaymentIntent } from "@/app/(booking)/book/actions";
 import { createClient } from "@/lib/supabase/server";
 import { FlowBar } from "@/components/chrome/FlowBar";
 import { PaymentPanel } from "@/components/booking/PaymentPanel";
@@ -15,7 +16,31 @@ export default async function PaymentPage({
   const supabase = await createClient();
   // The consents probe only needs the booking id, so it runs alongside the
   // context read rather than after it. RLS limits it to the caller's own rows.
-  const [ctx, consent, hold] = await Promise.all([
+  //
+  // The deposit intent is minted HERE, in the render, rather than in an effect
+  // after hydration. It used to cost the student three serial legs before a card
+  // field existed: hydrate, then a createPaymentIntent round trip, then Stripe's
+  // iframe. Now it rides along with the reads above, so it costs max(reads,
+  // Stripe) instead of reads-then-Stripe, and the panel mounts with a client
+  // secret already in hand.
+  //
+  // Deposit, not `mode`, because that is always the opening state: chosenMode
+  // starts at "deposit" and a waiting-list booking is pinned to it (audit #17).
+  // Switching to pay-in-full still goes through the action from the client.
+  //
+  // Safe to run before the guards below because createPaymentIntent repeats every
+  // one of them itself - ownership, pending status, and the consents/insurance
+  // gate (audit #39) - and returns an error instead of minting anything when they
+  // fail. It is a directly callable server action, so it could never have trusted
+  // this page's checks anyway.
+  //
+  // PREFETCH NOTE: this render must not run speculatively, or a hover would mint
+  // a Stripe intent. It does not, because `loading.tsx` in this segment terminates
+  // an App Router prefetch before the page body executes (measured: a request with
+  // Next-Router-Prefetch:1 returns the boundary and never invokes this function).
+  // That file is therefore load-bearing for more than perceived speed - do not
+  // delete it without moving this call back into the client.
+  const [ctx, consent, hold, initialIntent] = await Promise.all([
     getBookingContext(bookingId),
     supabase
       .from("consents")
@@ -34,6 +59,7 @@ export default async function PaymentPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    createPaymentIntent(bookingId, "deposit"),
   ]);
   if (!ctx) notFound();
   if (ctx.booking.status !== "pending") redirect(`/book/${bookingId}/confirmation`);
@@ -78,6 +104,11 @@ export default async function PaymentPage({
         tripName={ctx.trip.name}
         tripMeta={`${ctx.trip.resort} · ${formatDateRange(ctx.trip.start_date, ctx.trip.end_date)} · 1 place`}
         isWaitlist={hold.data?.is_waitlist ?? false}
+        initialDeposit={
+          initialIntent.ok
+            ? { clientSecret: initialIntent.clientSecret, error: null }
+            : { clientSecret: null, error: initialIntent.error }
+        }
       />
     </>
   );

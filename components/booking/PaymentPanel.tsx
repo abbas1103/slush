@@ -106,6 +106,7 @@ export function PaymentPanel({
   tripName,
   tripMeta,
   isWaitlist = false,
+  initialDeposit,
 }: {
   bookingId: string;
   pricing: Pricing;
@@ -114,14 +115,32 @@ export function PaymentPanel({
   tripMeta: string;
   /** True when the server reserved a waiting-list spot rather than a place. */
   isWaitlist?: boolean;
+  /**
+   * The deposit intent the PAGE already minted during its render, so the card
+   * form can mount on first paint instead of after a round trip (see the payment
+   * page). Carries the error instead when that failed, so the panel shows the
+   * same message and Try again it always did.
+   */
+  initialDeposit?: { clientSecret: string | null; error: string | null };
 }) {
   const [chosenMode, setChosenMode] = useState<PayMode>("deposit");
   const [attempt, setAttempt] = useState(0);
+  // Seeded from the server so the first render already has a secret. The key must
+  // match the one derived below for attempt 0 in deposit mode, or this is ignored
+  // and the effect fetches as before.
   const [result, setResult] = useState<{
     key: string;
     clientSecret: string | null;
     error: string | null;
-  } | null>(null);
+  } | null>(
+    initialDeposit
+      ? {
+          key: `${bookingId}|deposit|0`,
+          clientSecret: initialDeposit.clientSecret,
+          error: initialDeposit.error,
+        }
+      : null,
+  );
 
   // A waiting-list booking pays the refundable deposit only - never the whole
   // trip for a place that may never open (audit #17).
@@ -137,10 +156,26 @@ export function PaymentPanel({
   const current = result && result.key === key ? result : null;
 
   const inFlight = useRef<Promise<void> | null>(null);
-  const requested = useRef(false);
+  // Whether a request has already been made for this panel. Starts true when the
+  // server seeded us, so the debounce applies from the very first mode switch -
+  // there is no longer a "first load" that needs to be instant.
+  const requested = useRef(!!initialDeposit);
+  /**
+   * The one key the server already answered. Consumed on the first effect run so
+   * the panel does not immediately re-request what it was handed. Only that key:
+   * a mode switch, a switch back, or a retry all bump the key and fetch normally,
+   * which they must - flipping to pay-in-full CANCELS the deposit intent, so the
+   * seeded secret is dead the moment the student changes their mind.
+   */
+  const seededKey = useRef<string | null>(initialDeposit ? `${bookingId}|deposit|0` : null);
 
   useEffect(() => {
     let stale = false;
+    // Already answered server-side: consume the seed and skip this round trip.
+    if (seededKey.current === key) {
+      seededKey.current = null;
+      return;
+    }
     // First load is immediate; later switches wait for the choice to settle.
     const timer = setTimeout(() => {
       requested.current = true;
