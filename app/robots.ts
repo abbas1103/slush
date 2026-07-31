@@ -22,7 +22,6 @@ export default function robots(): MetadataRoute.Robots {
           "/dashboard",
           "/help",
           "/login",
-          "/monitoring",
           "/reset",
           "/signup",
           "/tickets",

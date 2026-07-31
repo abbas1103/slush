@@ -10,6 +10,11 @@ take real money.** Live Stripe keys are added **only in Vercel Production, only 
 ## 1. Supabase (production project - separate from dev)
 
 - [ ] Create a **new, EU-region** Supabase project (prod ≠ dev). Note the project ref.
+      Pick **London (`eu-west-2`)** to match the `lhr1` Vercel region in step 2, and if you choose a
+      different region change `vercel.json` to match it. This pairing is load-bearing, not cosmetic:
+      the app authorises on a verified `getUser()` on every render, which is a network call to the
+      Auth server, so a region mismatch puts a cross-region hop on the critical path of every
+      authenticated page. GDPR-wise any EU region is fine; the constraint here is latency.
 - [ ] Apply migrations to prod:
       `npx supabase db push --db-url "$PROD_DB_URL"` (all files in `supabase/migrations/`, in
       filename order). The audit remediation adds three, and they must all land:
@@ -78,7 +83,6 @@ its own, and PITR is a paid add-on that is **off by default**.
   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (test in Preview; **live in Production, owner-only**)
   - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
-  - `NEXT_PUBLIC_SENTRY_DSN` (publishable)
 
   **Secret (server-only):**
   - `SUPABASE_SECRET_KEY` (service role) - never `NEXT_PUBLIC_`
@@ -94,7 +98,10 @@ its own, and PITR is a paid add-on that is **off by default**.
     event queued, so nothing is lost. For Zoho set `CRM_PROVIDER=zoho` plus `ZOHO_CLIENT_ID`,
     `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` and `ZOHO_ACCOUNTS_URL` (the data centre, e.g.
     `https://accounts.zoho.eu`). See `lib/crm/adapters.ts`.
-- [ ] Region: `vercel.json` pins `fra1` (EU) to sit near the EU Supabase project.
+- [ ] Region: `vercel.json` pins **`lhr1`** (London). This must stay next to the Supabase project's
+      region - see step 1, which is where the choice is actually made. Every render authorises on a
+      verified `getUser()`, so the function-to-database round trip is on the critical path of every
+      authenticated page; putting the two in different regions adds that latency back to each one.
 
 ## 3. Stripe (test throughout build; live only at go-live, by owner)
 
@@ -108,10 +115,19 @@ its own, and PITR is a paid add-on that is **off by default**.
 ## 4. Sentry (error tracking, PII-scrubbed)
 
 - [ ] Create an **EU-region** Sentry project. Set the DSN vars (step 2).
-- [ ] Wiring is already done and **env-gated** - with no DSN it's fully inert. Browser events
-      tunnel same-origin via `/monitoring` (no CSP change needed). Session Replay is intentionally
-      **off** (would record passport/DOB/card fields). `sendDefaultPii:false` + a `beforeSend`
-      scrubber strip request bodies/cookies/headers/query strings.
+- [ ] Wiring is already done and **env-gated** on `SENTRY_DSN` - with no DSN it's fully inert.
+      **Server-side only**: the browser SDK was removed because it was ~76 KB gzipped in the chunk
+      every route loaded eagerly, and it could not be slimmed (its `bundleSizeOptimizations` flags
+      are no-ops under Turbopack - the tree-shaking defines are injected only by the webpack path).
+      There is therefore **no `NEXT_PUBLIC_SENTRY_DSN` and no `/monitoring` tunnel** any more.
+- [ ] Client errors still reach Sentry: the error boundaries POST a small envelope to
+      `/api/client-error`, which reports through the server SDK. That endpoint is unauthenticated by
+      necessity (a boundary can fire before a session exists), so it trusts nothing - 2 KB body cap,
+      strict schema, per-IP rate limit, and a uniform 204 so it cannot be used to probe the
+      validation. It sends no stacks, bodies, cookies or query strings.
+- [ ] Session Replay is intentionally **off** (would record passport/DOB/card fields).
+      `sendDefaultPii:false` + a `beforeSend` scrubber strip request bodies/cookies/headers/query
+      strings.
 - [ ] For source-map upload set `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` (build-time).
       Without the auth token the build still succeeds (upload skipped).
 

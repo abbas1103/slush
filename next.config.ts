@@ -56,7 +56,12 @@ const nextConfig: NextConfig = {
  * Client errors now arrive via `/api/client-error` (see lib/observability/report.ts)
  * and are reported through the server SDK instead.
  */
-const sentryEnabled = !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN);
+// Gated on the SERVER DSN alone. It used to accept NEXT_PUBLIC_SENTRY_DSN too,
+// which made sense while a browser SDK existed to consume it. Nothing reads the
+// public DSN now, so requiring the server one means the plugin is enabled exactly
+// when server-side Sentry is (sentry.server.config.ts reads SENTRY_DSN), instead
+// of being switchable by a variable with no remaining consumer.
+const sentryEnabled = !!process.env.SENTRY_DSN;
 
 export default sentryEnabled
   ? withSentryConfig(nextConfig, {

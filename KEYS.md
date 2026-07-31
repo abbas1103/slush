@@ -34,7 +34,7 @@ themselves live only in `.env.local` (local, gitignored) and Vercel's env settin
 | `TURNSTILE_SECRET_KEY` | Cloudflare | **yes** | optional | CAPTCHA secret |
 | `UPSTASH_REDIS_REST_URL` | Upstash | no | optional | Rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash | **yes** | optional | Rate limiting |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Sentry | no | optional | Inert if unset |
+| `SENTRY_DSN` | Sentry | no | optional | Server-side only; inert if unset |
 | `SENTRY_ORG` / `SENTRY_PROJECT` | Sentry | no | no | Build-time (source maps) |
 | `SENTRY_AUTH_TOKEN` | Sentry | **yes** | no | Build-time only |
 | `CRM_PROVIDER` | - | no | optional | `zoho` or blank |
@@ -147,8 +147,9 @@ Without these, rate limiting on login / trip-code / payment is simply inactive l
 Dashboard: <https://sentry.io> → create a **Next.js** project (an **EU-region** org is preferred for
 UK PII).
 
-- `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` - the **DSN** (Project Settings → Client Keys). Same value
-  in both; DSNs are publishable, not secret.
+- `SENTRY_DSN` - the **DSN** (Project Settings → Client Keys). Publishable, not secret. Server-side
+  only; there is no `NEXT_PUBLIC_SENTRY_DSN` because there is no browser SDK (client errors are
+  posted to `/api/client-error` and reported from the server).
 - `SENTRY_ORG` / `SENTRY_PROJECT` - the org and project slugs (from the URL or settings). Build-time
   only, for source-map upload.
 - `SENTRY_AUTH_TOKEN` - an auth token (Settings → Auth Tokens) with source-map upload scope.
